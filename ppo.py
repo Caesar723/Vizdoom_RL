@@ -30,17 +30,17 @@ class ActorCritic(nn.Module):
         orthogonal_init(self.actor,gain=0.01)
 
     def forward(self, images_seq1, images_seq2, state_seq,obj_ids):
-        print("images_seq1.shape:",images_seq1.shape,images_seq1)
-        print("images_seq2.shape:",images_seq2.shape,images_seq2)
-        print("state_seq.shape:",state_seq.shape,state_seq)
-        print("obj_ids.shape:",obj_ids.shape,obj_ids)
+        # print("images_seq1.shape:",images_seq1.shape,images_seq1)
+        # print("images_seq2.shape:",images_seq2.shape,images_seq2)
+        # print("state_seq.shape:",state_seq.shape,state_seq)
+        # print("obj_ids.shape:",obj_ids.shape,obj_ids)
         x = self.net(images_seq1, images_seq2, state_seq,obj_ids)
         value = self.critic(x)
         
         action_prob = self.softmax(self.actor(x))
-        print(action_prob)
-        print(action_prob.shape)
-        print("action_prob sum:", action_prob.sum(dim=-1))
+        # print(action_prob)
+        # print(action_prob.shape)
+        # print("action_prob sum:", action_prob.sum(dim=-1))
         dist = Categorical(action_prob)
         return value, action_prob, dist,dist.entropy()
 
@@ -108,7 +108,7 @@ class PPO:
         self.epochs=5
         self.max_step=3000000
         self.total_step=0
-        self.lr=1e-4
+        self.lr=2e-5
         self.device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
         self.model = ActorCritic(input_dim=input_dim, hidden_dim=128, output_dim=output_dim).to(self.device)
         #self.load_model("model_complete.pth")
