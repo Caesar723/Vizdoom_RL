@@ -195,6 +195,10 @@ class PPO:
         self.reward_scale.reset()
         
         gc.collect()
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+        elif self.device.type == "mps":
+            torch.mps.empty_cache()
         #torch.mps.empty_cache()
 
     def advantage_cal(self,delta:torch.Tensor,done:torch.Tensor):
