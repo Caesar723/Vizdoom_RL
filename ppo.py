@@ -113,7 +113,7 @@ class PPO:
         self.model = ActorCritic(input_dim=input_dim, hidden_dim=128, output_dim=output_dim).to(self.device)
         #self.load_model("model_complete.pth")
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, eps=1e-5)
-        self.scheduler=StepLR(self.optimizer, step_size=5, gamma=0.99)
+        self.scheduler=StepLR(self.optimizer, step_size=200, gamma=0.99)
         self.MSEloss=nn.MSELoss()
         self.reward_scale=RewardScaling(0.99)
 
