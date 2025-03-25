@@ -30,10 +30,10 @@ class ActorCritic(nn.Module):
         orthogonal_init(self.actor,gain=0.01)
 
     def forward(self, images_seq1, images_seq2, state_seq,obj_ids):
-        print("images_seq1.shape:",images_seq1.shape)
-        print("images_seq2.shape:",images_seq2.shape)
-        print("state_seq.shape:",state_seq.shape)
-        print("obj_ids.shape:",obj_ids.shape)
+        print("images_seq1.shape:",images_seq1.shape,images_seq1)
+        print("images_seq2.shape:",images_seq2.shape,images_seq2)
+        print("state_seq.shape:",state_seq.shape,state_seq)
+        print("obj_ids.shape:",obj_ids.shape,obj_ids)
         x = self.net(images_seq1, images_seq2, state_seq,obj_ids)
         value = self.critic(x)
         
