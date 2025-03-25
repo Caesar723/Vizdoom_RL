@@ -188,7 +188,7 @@ class PPO:
         self.reward_scale.reset()
         
         gc.collect()
-        torch.mps.empty_cache()
+        #torch.mps.empty_cache()
 
     def advantage_cal(self,delta:torch.Tensor,done:torch.Tensor):
         advantage_list=[]
