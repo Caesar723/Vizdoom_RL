@@ -325,6 +325,7 @@ class PPO:
             self.best_mean_reward=self.rewards/self.step
             torch.save(self.model, '/mnt/model_complete.pth')
             #torch.save(self.model_val, 'model_complete_val.pth')
+        torch.save(self.model, '/mnt/model_complete_normal.pth')
         self.rewards_store.append(self.rewards)
         self.rewards = 0
         self.step=0
