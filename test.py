@@ -57,7 +57,7 @@ game.set_depth_buffer_enabled(True)  # 启用深度缓冲区
 game.set_labels_buffer_enabled(True)
 game.set_automap_buffer_enabled(True)
 
-#game.set_window_visible(False)
+game.set_window_visible(False)
 game.init()
 
 agent = ppo.PPO(input_dim=10*8+2, output_dim=7)
