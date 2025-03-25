@@ -312,7 +312,7 @@ class PPO:
     def graph_on_rollout_end(self) -> None:
         if self.best_mean_reward<self.rewards/self.step:
             self.best_mean_reward=self.rewards/self.step
-            torch.save(self.model, 'model_complete.pth')
+            torch.save(self.model, '/mnt/model_complete.pth')
             #torch.save(self.model_val, 'model_complete_val.pth')
         self.rewards_store.append(self.rewards)
         self.rewards = 0
@@ -321,7 +321,7 @@ class PPO:
     
         self.ax.set_xlim(0, len(self.rewards_store))
         self.ax.set_ylim(min(self.rewards_store) - 5, max(self.rewards_store) + 5)
-        plt.savefig('ppo_training_reward.png')
+        plt.savefig('/mnt/ppo_training_reward.png')
         
     def graph_on_step(self,reward):
             self.step+=1
