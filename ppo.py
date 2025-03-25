@@ -34,6 +34,9 @@ class ActorCritic(nn.Module):
         value = self.critic(x)
         
         action_prob = self.softmax(self.actor(x))
+        print(action_prob)
+        print(action_prob.shape)
+        print("action_prob sum:", action_prob.sum(dim=-1))
         dist = Categorical(action_prob)
         return value, action_prob, dist,dist.entropy()
 
