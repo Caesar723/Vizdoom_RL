@@ -20,6 +20,7 @@ def get_state(game):
         if  len(game_vars)+8>number*8+2:
             break
         obj_ids.append(label.object_id+1)
+        print(label.object_id)
         
         game_vars.append(label.object_position_x)
         game_vars.append(label.object_position_y)
