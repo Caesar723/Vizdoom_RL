@@ -113,8 +113,7 @@ class PPO:
             self.device = torch.device("mps")
         elif torch.cuda.is_available():
             self.device = torch.device("cuda")
-            torch.backends.cudnn.enable =True
-            torch.backends.cudnn.benchmark = True
+            
         else:
             self.device = torch.device("cpu")
         
