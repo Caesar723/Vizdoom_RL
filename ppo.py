@@ -108,7 +108,7 @@ class PPO:
         self.epochs=5
         self.max_step=3000000
         self.total_step=0
-        self.lr=2e-5
+        self.lr=1e-4
         self.device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
         self.model = ActorCritic(input_dim=input_dim, hidden_dim=128, output_dim=output_dim).to(self.device)
         #self.load_model("model_complete.pth")
@@ -195,10 +195,10 @@ class PPO:
         self.reward_scale.reset()
         
         gc.collect()
-        # if self.device.type == "cuda":
-        #     torch.cuda.empty_cache()
-        # elif self.device.type == "mps":
-        #     torch.mps.empty_cache()
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+        elif self.device.type == "mps":
+            torch.mps.empty_cache()
         #torch.mps.empty_cache()
 
     def advantage_cal(self,delta:torch.Tensor,done:torch.Tensor):
