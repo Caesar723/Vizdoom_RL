@@ -30,10 +30,10 @@ class ActorCritic(nn.Module):
         orthogonal_init(self.actor,gain=0.01)
 
     def forward(self, images_seq1, images_seq2, state_seq,obj_ids):
-        print("images_seq1.shape:",images_seq1.shape,images_seq1)
-        print("images_seq2.shape:",images_seq2.shape,images_seq2)
-        print("state_seq.shape:",state_seq.shape,state_seq)
-        print("obj_ids.shape:",obj_ids.shape,obj_ids)
+        # print("images_seq1.shape:",images_seq1.shape,images_seq1)
+        # print("images_seq2.shape:",images_seq2.shape,images_seq2)
+        # print("state_seq.shape:",state_seq.shape,state_seq)
+        # print("obj_ids.shape:",obj_ids.shape,obj_ids)
         x = self.net(images_seq1, images_seq2, state_seq,obj_ids)
         value = self.critic(x)
         
@@ -109,7 +109,15 @@ class PPO:
         self.max_step=3000000
         self.total_step=0
         self.lr=0.2e-5
-        self.device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
+        if torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        elif torch.cuda.is_available():
+            self.device = torch.device("cuda")
+            torch.backends.cudnn.enable =True
+            torch.backends.cudnn.benchmark = True
+        else:
+            self.device = torch.device("cpu")
+        
         self.model = ActorCritic(input_dim=input_dim, hidden_dim=128, output_dim=output_dim).to(self.device)
         #self.load_model("model_complete.pth")
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, eps=1e-5)
