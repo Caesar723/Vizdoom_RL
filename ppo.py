@@ -18,9 +18,9 @@ def orthogonal_init(layer, gain=1.0):
     nn.init.constant_(layer.bias, 0)
 
 class ActorCritic(nn.Module):
-    def __init__(self,input_dim, hidden_dim, output_dim):
+    def __init__(self,num_objects,input_dim, hidden_dim, output_dim):
         super().__init__()
-        self.net = net.Net(d_t=128, d_r=128, d_state=input_dim, hidden_dim=hidden_dim, num_layers=2, action_dim=output_dim,vocab_size=10,embedding_dim=64)
+        self.net = net.Net(d_t=128, d_r=128, d_state=input_dim, hidden_dim=hidden_dim, num_layers=2, action_dim=output_dim,vocab_size=num_objects,embedding_dim=64)
         self.softmax = nn.Softmax(dim=-1)
         self.critic = nn.Linear(hidden_dim, 1)
         self.actor = nn.Linear(hidden_dim, output_dim)
@@ -101,7 +101,7 @@ class RewardScaling:#Trick 4—Reward Scaling
 class PPO:
     
 
-    def __init__(self,input_dim, output_dim):#input_dim: state
+    def __init__(self,num_objects,input_dim, output_dim):#input_dim: state
         self.gamma=0.99
         self.lambd=0.95
         self.clip_para=0.2
@@ -118,7 +118,7 @@ class PPO:
         else:
             self.device = torch.device("cpu")
         
-        self.model = ActorCritic(input_dim=input_dim, hidden_dim=128, output_dim=output_dim).to(self.device)
+        self.model = ActorCritic(num_objects=num_objects,input_dim=input_dim, hidden_dim=128, output_dim=output_dim).to(self.device)
         #self.load_model("model_complete.pth")
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, eps=1e-5)
         self.scheduler=StepLR(self.optimizer, step_size=200, gamma=0.99)

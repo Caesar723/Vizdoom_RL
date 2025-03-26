@@ -11,7 +11,7 @@ def image_process(image):
     return image
 
 def get_state(game):
-    number=10
+    number=num_objects
     state = game.get_state()
     labels = state.labels
     game_vars = list(state.game_variables)[:-2]
@@ -44,7 +44,7 @@ def get_state(game):
 # 初始化 DoomGame
 game = vzd.DoomGame()
 print(vzd.scenarios_path)
-game.load_config(vzd.scenarios_path + "/deadly_corridor.cfg")
+game.load_config(vzd.scenarios_path + "/deathmatch.cfg")
 
 # 启用深度图
 game.set_available_game_variables([
@@ -60,10 +60,13 @@ game.set_automap_buffer_enabled(True)
 game.set_window_visible(False)
 game.init()
 
-agent = ppo.PPO(input_dim=10*8+2, output_dim=7)
+num_actions=16
+num_objects=20
+agent = ppo.PPO(num_objects=num_objects,input_dim=num_objects*8+2, output_dim=num_actions)
 
 
 step=0
+frame_repeat=12
 while True:
     game.new_episode()  # 重新开始游戏
     
@@ -93,9 +96,12 @@ while True:
             
             
                 action = agent.choose_act(torch_state_list, torch_obj_ids_list, torch_image1_list, torch_image2_list)
-            action_list = np.zeros(7)
+            
+            action_list = np.zeros(num_actions)
             action_list[action] = 1
-            reward = game.make_action(action_list, 7)/2
+            reward = game.make_action(action_list)/2
+            for _ in range(frame_repeat):
+                game.advance_action()
             current_kill_count = game.get_game_variable(vzd.GameVariable.KILLCOUNT)
             current_health = game.get_game_variable(vzd.GameVariable.HEALTH)
             #print((current_kill_count - previous_kill_count) * 80)
