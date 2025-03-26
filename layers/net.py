@@ -11,7 +11,7 @@ else:
 class Net(nn.Module):
     def __init__(self,d_t,d_r,d_state, hidden_dim, num_layers,action_dim,vocab_size,embedding_dim):
         super().__init__()
-        self.embedding = nn.Embedding(80, embedding_dim)
+        self.embedding = nn.Embedding(150, embedding_dim)
         self.embedding.weight.data.normal_(0, 0.02)
         self.resnet1 = ResNet([1, 1, 1, 1], channel_in=1)#(N, d_r)
         self.resnet2 = ResNet([1, 1, 1, 1], channel_in=1)#(N, d_r)
