@@ -92,7 +92,9 @@ while True:
                     
             
             
-                action = agent.choose_act(torch_state_list, torch_obj_ids_list, torch_image1_list, torch_image2_list)
+                action,action_log_prob,value = agent.choose_act(torch_state_list, torch_obj_ids_list, torch_image1_list, torch_image2_list)
+
+            
             action_list = np.zeros(7)
             action_list[action] = 1
             reward = game.make_action(action_list, 7)/2
@@ -121,7 +123,9 @@ while True:
                         torch_obj_ids_list.squeeze(0),
                         torch_image1_list.squeeze(0),
                         torch_image2_list.squeeze(0),
-                        done
+                        done,
+                        action_log_prob,
+                        value
                         )
                     step+=1
                 if step%320==0:
@@ -156,7 +160,9 @@ while True:
                         next_torch_obj_ids_list.squeeze(0),
                         next_torch_image1_list.squeeze(0),
                         next_torch_image2_list.squeeze(0),
-                        done
+                        done,
+                        action_log_prob,
+                        value
                         )
                     step+=1
                 if step%320==0:

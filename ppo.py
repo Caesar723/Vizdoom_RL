@@ -110,7 +110,13 @@ class PPO:
         self.total_step=0
         self.lr=2e-5
         self.device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
-        self.model = ActorCritic(input_dim=input_dim, hidden_dim=128, output_dim=output_dim).to(self.device)
+        self.model = ActorCritic(input_dim=input_dim, hidden_dim=128, output_dim=output_dim)
+
+        # if torch.cuda.device_count() > 1:
+        #     print("使用", torch.cuda.device_count(), "个GPU")
+        #     self.model = nn.DataParallel(self.model)
+
+        self.model = self.model.to(self.device) 
         #self.load_model("model_complete.pth")
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, eps=1e-5)
         self.scheduler=StepLR(self.optimizer, step_size=200, gamma=0.99)
@@ -125,6 +131,9 @@ class PPO:
         self.images_seq2 = []
         self.action = []
         self.reward = []
+        self.v=[]
+        self.v_=[]
+        self.action_log_prob = []
         self.next_state = []
         self.done = []
         self.next_images_seq1 = []
@@ -158,11 +167,13 @@ class PPO:
         with torch.no_grad():
             value, action_prob, dist, entropy = self.model(images_seq1,images_seq2,state,obj_ids)
             action = dist.sample()
-            #action_log_prob = dist.log_prob(action)
+            action_log_prob = dist.log_prob(action)
+            
+            
         
-        return action.item()
+        return action.item(),action_log_prob.item(),value.item()
     
-    def store(self,state,obj_ids,images_seq1,images_seq2,action,reward,next_state,next_obj_ids,next_images_seq1,next_images_seq2,done):
+    def store(self,state,obj_ids,images_seq1,images_seq2,action,reward,next_state,next_obj_ids,next_images_seq1,next_images_seq2,done,action_log_prob,value):
         self.graph_on_step(reward)
         self.state.append(state)
         self.obj_ids.append(obj_ids)
@@ -170,34 +181,50 @@ class PPO:
         self.images_seq2.append(images_seq2)
         self.action.append(action)
         #reward=self.reward_scale(reward)
+        
         self.reward.append(reward)
         self.next_state.append(next_state)
         self.next_obj_ids.append(next_obj_ids)
         self.done.append(done)
         self.next_images_seq1.append(next_images_seq1)
         self.next_images_seq2.append(next_images_seq2)
+        self.action_log_prob.append(action_log_prob)
+        self.v.append(value)
 
         
 
 
     def clean(self):
+        del self.state[:]
+        del self.images_seq1[:]
+        del self.images_seq2[:]
+        del self.obj_ids[:]
+        del self.action[:]
+        del self.reward[:]
+        del self.next_state[:]
+        del self.next_obj_ids[:]
+        del self.next_images_seq1[:]
+        del self.next_images_seq2[:]
+        del self.done[:]
+        del self.action_log_prob[:]
+        del self.v[:]
         self.state=[]
         self.images_seq1=[]
         self.images_seq2=[]
-        self.obj_ids=[]
-        self.action=[]
-        self.reward=[]
         self.next_state=[]
         self.next_obj_ids=[]
         self.next_images_seq1=[]
         self.next_images_seq2=[]
         self.done=[]
+        self.action_log_prob=[]
+        self.v=[]
         self.reward_scale.reset()
         
         gc.collect()
         if self.device.type == "cuda":
             torch.cuda.empty_cache()
         elif self.device.type == "mps":
+            print("mps empty cache")
             torch.mps.empty_cache()
         #torch.mps.empty_cache()
 
@@ -216,19 +243,35 @@ class PPO:
         return np.array(advantage_list)
     
     def train(self):
-        self.graph_on_rollout_end()
-        state=torch.FloatTensor(np.array(self.state)).to(self.device).detach()
-        obj_ids=torch.IntTensor(np.array(self.obj_ids)).to(self.device).detach()
-        images_seq1=torch.FloatTensor(np.array(self.images_seq1)).to(self.device).detach()
-        images_seq2=torch.FloatTensor(np.array(self.images_seq2)).to(self.device).detach()
-        action=torch.LongTensor(np.array(self.action)).unsqueeze(1).to(self.device).detach()
-        done=torch.FloatTensor(np.array(self.done)).unsqueeze(1).to(self.device).detach()
-        next_obj_ids=torch.IntTensor(np.array(self.next_obj_ids)).to(self.device).detach()
-        next_state=torch.FloatTensor(np.array(self.next_state)).to(self.device).detach()
-        next_images_seq1=torch.FloatTensor(np.array(self.next_images_seq1)).to(self.device).detach()
-        next_images_seq2=torch.FloatTensor(np.array(self.next_images_seq2)).to(self.device).detach()
-        reward=torch.FloatTensor(np.array(self.reward)).unsqueeze(1).to(self.device).detach()
-
+        #self.graph_on_rollout_end()
+        state_cpu=torch.FloatTensor(np.array(self.state))#.to(self.device).detach()
+        obj_ids_cpu=torch.IntTensor(np.array(self.obj_ids))#.to(self.device).detach()
+        images_seq1_cpu=torch.FloatTensor(np.array(self.images_seq1))#.to(self.device).detach()
+        images_seq2_cpu=torch.FloatTensor(np.array(self.images_seq2))#.to(self.device).detach()
+        action_cpu=torch.LongTensor(np.array(self.action)).unsqueeze(1)#.to(self.device).detach()
+        done_cpu=torch.FloatTensor(np.array(self.done)).unsqueeze(1)#.to(self.device).detach()
+        # next_obj_ids_cpu=torch.IntTensor(np.array(self.next_obj_ids))#.to(self.device).detach()
+        # next_state_cpu=torch.FloatTensor(np.array(self.next_state))#.to(self.device).detach()
+        # next_images_seq1_cpu=torch.FloatTensor(np.array(self.next_images_seq1))#.to(self.device).detach()
+        # next_images_seq2_cpu=torch.FloatTensor(np.array(self.next_images_seq2))#.to(self.device).detach()
+        reward_cpu=torch.FloatTensor(np.array(self.reward)).unsqueeze(1)#.to(self.device).detach()
+        action_log_prob_cpu=torch.FloatTensor(np.array(self.action_log_prob)).unsqueeze(1)#.to(self.device).detach()
+        v=torch.FloatTensor(np.array(self.v)).unsqueeze(1)#.to(self.device).detach()
+        self.v.pop(0)
+        self.v.append(self.v[-1])
+        v_=torch.FloatTensor(np.array(self.v)).unsqueeze(1)#.to(self.device).detach()
+        
+        del self.state[:]
+        del self.images_seq1[:]
+        del self.images_seq2[:]
+        del self.obj_ids[:]
+        del self.action[:]
+        del self.reward[:]
+        del self.next_state[:]
+        del self.next_obj_ids[:]
+        del self.next_images_seq1[:]
+        del self.next_images_seq2[:]
+        del self.done[:]
         
         # print(state.shape)
         # print(obj_ids.shape)
@@ -241,18 +284,43 @@ class PPO:
         # print(next_images_seq2.shape)
         # print(next_obj_ids.shape)
         # print(reward.shape)
-        with torch.no_grad():
-            v, _, dist,_ = self.model(images_seq1,images_seq2,state,obj_ids)
-            v_, _, _, _ = self.model(next_images_seq1,next_images_seq2,next_state,next_obj_ids)
-            delta=reward+self.gamma*v_*(1-done)-v
-            advantage=self.advantage_cal(delta,done)
-            advantage=torch.FloatTensor(advantage).detach().to(self.device)
+        with torch.no_grad(), torch.amp.autocast('cuda' if self.device.type == 'cuda' else 'mps'):
+            # state_gpu=state_cpu.to(self.device)
+            # obj_ids_gpu=obj_ids_cpu.to(self.device)
+            # images_seq1_gpu=images_seq1_cpu.to(self.device)
+            # images_seq2_gpu=images_seq2_cpu.to(self.device)
+            # next_images_seq1_gpu=next_images_seq1_cpu.to(self.device)
+            # next_images_seq2_gpu=next_images_seq2_cpu.to(self.device)
+            # next_obj_ids_gpu=next_obj_ids_cpu.to(self.device)
+            # next_state_gpu=next_state_cpu.to(self.device)
+            # reward_gpu=reward_cpu.to(self.device)
+            
+            # done_gpu=done_cpu.to(self.device)
+            # action_gpu=action_cpu.to(self.device)
+
+            
+
+            
+            # v, _, dist,_ = self.model(images_seq1_gpu,images_seq2_gpu,state_gpu,obj_ids_gpu)
+            # v_, _, _, _ = self.model(next_images_seq1_gpu,next_images_seq2_gpu,next_state_gpu,next_obj_ids_gpu)
+            delta=reward_cpu+self.gamma*v_*(1-done_cpu)-v
+            advantage=self.advantage_cal(delta,done_cpu)
+            advantage=torch.FloatTensor(advantage).detach()#.to(self.device)
             rewards=advantage+v
             advantage=self.normalize_adv(advantage)
             #print(advantage.shape)
-            action_log_prob = dist.log_prob(action.squeeze(-1))
+            #action_log_prob = dist.log_prob(action_cpu.squeeze(-1))
             #print(action_log_prob.shape)
+            #del state_gpu, obj_ids_gpu, images_seq1_gpu, images_seq2_gpu, next_images_seq1_gpu, next_images_seq2_gpu, next_obj_ids_gpu, next_state_gpu, reward_gpu, done_gpu, action_gpu
+            # if self.device.type == "cuda":
+            #     torch.cuda.empty_cache()
+            # elif self.device.type == "mps":
+            #     torch.mps.empty_cache()
+        rewards_cpu=rewards.detach().cpu()
+        advantage_cpu=advantage.detach().cpu()
+        #action_log_prob_cpu=action_log_prob.detach().cpu()
 
+       
         # dataset = TensorDataset(
         #     state,
         #     obj_ids,
@@ -268,7 +336,7 @@ class PPO:
         #     )
         #dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
         batch_size = 64
-        data_size=state.size(0)
+        data_size=state_cpu.size(0)
         for _ in range(self.epochs):
             # indices = torch.randperm(data_size)
             # state=state[indices]
@@ -283,15 +351,15 @@ class PPO:
             print("epoch",_)
             #for batch in dataloader:
             for i in range(0,data_size,batch_size):
-                state_batch=state[i:i+batch_size]
-                obj_ids_batch=obj_ids[i:i+batch_size]
-                images_seq1_batch=images_seq1[i:i+batch_size]
-                images_seq2_batch=images_seq2[i:i+batch_size]
-                action_batch=action[i:i+batch_size]
+                state_batch=state_cpu[i:i+batch_size].to(self.device)
+                obj_ids_batch=obj_ids_cpu[i:i+batch_size].to(self.device)
+                images_seq1_batch=images_seq1_cpu[i:i+batch_size].to(self.device)
+                images_seq2_batch=images_seq2_cpu[i:i+batch_size].to(self.device)
+                action_batch=action_cpu[i:i+batch_size].to(self.device)
                 
-                advantage_batch=advantage[i:i+batch_size]
-                action_log_prob_batch=action_log_prob[i:i+batch_size]
-                rewards_batch=rewards[i:i+batch_size]
+                advantage_batch=advantage_cpu[i:i+batch_size].to(self.device)
+                action_log_prob_batch=action_log_prob_cpu[i:i+batch_size].to(self.device)
+                rewards_batch=rewards_cpu[i:i+batch_size].to(self.device)
 
 
 
@@ -316,6 +384,13 @@ class PPO:
                 self.optimizer.step()
                 self.scheduler.step()
                 print("loss",loss)
+                # del (state_batch, obj_ids_batch, images_seq1_batch, images_seq2_batch,
+                #  action_batch, advantage_batch, action_log_prob_batch, rewards_batch,
+                #  v, dist, new_prob_log, rate, surr1, surr2, val_loss, act_loss, entropy, loss)
+                # if self.device.type == "cuda":
+                #     torch.cuda.empty_cache()
+                # elif self.device.type == "mps":
+                #     torch.mps.empty_cache()
 
         
         self.clean()
