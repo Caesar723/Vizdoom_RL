@@ -194,7 +194,7 @@ class PPO:
         self.done=[]
         self.reward_scale.reset()
         
-        # gc.collect()
+        gc.collect()
         # if self.device.type == "cuda":
         #     torch.cuda.empty_cache()
         # elif self.device.type == "mps":
