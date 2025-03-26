@@ -243,7 +243,7 @@ class PPO:
         return np.array(advantage_list)
     
     def train(self):
-        #self.graph_on_rollout_end()
+        self.graph_on_rollout_end()
         state_cpu=torch.FloatTensor(np.array(self.state))#.to(self.device).detach()
         obj_ids_cpu=torch.IntTensor(np.array(self.obj_ids))#.to(self.device).detach()
         images_seq1_cpu=torch.FloatTensor(np.array(self.images_seq1))#.to(self.device).detach()
