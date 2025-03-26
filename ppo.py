@@ -117,7 +117,7 @@ class PPO:
         self.MSEloss=nn.MSELoss()
         self.reward_scale=RewardScaling(0.99)
 
-        self.warmup_steps = 5
+        self.warmup_steps = 4
 
         self.state = []
         self.obj_ids=[]

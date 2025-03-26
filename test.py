@@ -124,7 +124,7 @@ while True:
                         done
                         )
                     step+=1
-                if step%320==0:
+                if step%256==0:
                     agent.train()
                     step=0
                 break
@@ -159,7 +159,7 @@ while True:
                         done
                         )
                     step+=1
-                if step%320==0:
+                if step%256==0:
                     agent.train()
                     step=0
                     break
