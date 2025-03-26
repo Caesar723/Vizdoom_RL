@@ -101,7 +101,7 @@ while True:
             #print((current_kill_count - previous_kill_count) * 80)
             #print((current_health - previous_health) * 2)
             reward += (current_kill_count - previous_kill_count) * 50
-            reward += (current_health - previous_health) * 2
+            reward += (current_health - previous_health) * 0.2
             previous_kill_count = current_kill_count
             previous_health = current_health
             reward = reward/100
