@@ -108,7 +108,7 @@ class PPO:
         self.epochs=5
         self.max_step=3000000
         self.total_step=0
-        self.lr=1e-4
+        self.lr=0.2e-5
         self.device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
         self.model = ActorCritic(input_dim=input_dim, hidden_dim=128, output_dim=output_dim).to(self.device)
         #self.load_model("model_complete.pth")
