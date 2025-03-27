@@ -113,6 +113,9 @@ class PPO:
             self.device = torch.device("mps")
         elif torch.cuda.is_available():
             self.device = torch.device("cuda")
+            torch.backends.cudnn.enabled = True
+            torch.backends.cudnn.benchmark = True
+
             
         else:
             self.device = torch.device("cpu")
@@ -186,7 +189,7 @@ class PPO:
 
         
 
-
+    
     def clean(self):
         self.state=[]
         self.images_seq1=[]
@@ -223,7 +226,7 @@ class PPO:
         return np.array(advantage_list)
     
     def train(self):
-        self.graph_on_rollout_end()
+        #self.graph_on_rollout_end()
         state=torch.FloatTensor(np.array(self.state)).to(self.device).detach()
         obj_ids=torch.IntTensor(np.array(self.obj_ids)).to(self.device).detach()
         images_seq1=torch.FloatTensor(np.array(self.images_seq1)).to(self.device).detach()
