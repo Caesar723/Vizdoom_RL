@@ -72,7 +72,7 @@ def main():
 
     step=0
     frame_repeat=12
-    for i in range(6):#while True:
+    while True:
         game.new_episode()  # 重新开始游戏
         
         state_list = []
