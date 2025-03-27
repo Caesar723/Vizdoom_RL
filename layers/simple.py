@@ -9,58 +9,91 @@ else:
     from layers.transformer import GameTransformer
 
 class Net(nn.Module):
-    def __init__(self,d_t,d_r,d_state, hidden_dim, num_layers,action_dim,vocab_size,embedding_dim):
+    def __init__(self,input_size_1,input_size_2,input_size_3):
         super().__init__()
-        self.embedding = nn.Embedding(50, embedding_dim)
-        self.embedding.weight.data.normal_(0, 0.02)
-        self.resnet1 = ResNet([1, 1, 1, 1], channel_in=1)#(N, d_r)
-        self.resnet2 = ResNet([1, 1, 1, 1], channel_in=1)#(N, d_r)
-        #self.resnet3 = ResNet([2, 2, 2, 2], channel_in=1)#(N, d_r)
         
-        self.state_proj=nn.Linear(d_state+embedding_dim*vocab_size, d_t)
-        self.transformer = nn.Linear(d_t,d_t)
-        self.lstm = nn.Linear(d_t + d_r*2, hidden_dim)
-        self.fc = nn.Linear(hidden_dim, action_dim)
+        
+        self.conv1 = nn.Sequential(
+            # 第一个卷积块
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
 
-    def forward(self, images_seq1, images_seq2, state_seq,obj_ids):
-        N,T,  C, H, W = images_seq1.shape
-        N2,T2, C2, H2, W2 = images_seq2.shape
-        #T3, N3, C3, H3, W3 = images_seq3.shape
+            # 第二个卷积块
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
 
-        flat_imgs1 = images_seq1.view(T * N, C, H, W)
-        flat_imgs2 = images_seq2.view(T2 * N2, C2, H2, W2)
+            # 第三个卷积块
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)
+        )# for images_seq1
+
+        self.conv2 = nn.Sequential(
+            # 第一个卷积块
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+
+            # 第二个卷积块
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+
+            # 第三个卷积块
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)
+        )# for images_seq2
+        self.conv3=nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+
+            # 第二个卷积块
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+
+            # 第三个卷积块
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)
+            
+        )
+        #self.resnet3 = ResNet([2, 2, 2, 2], channel_in=1)#(N, d_r)
+        size=sum(i//8*i//8*128 for i in [input_size_1,input_size_2,input_size_3])
+        self.fc1 = nn.Linear(size, 1024)
+        self.fc2 = nn.Linear(1024, 512)
+        self.fc3 = nn.Linear(512, 256)
+        self.fc4 = nn.Linear(256, 128)
+
+    def forward(self, images_seq1, images_seq2, images_seq3):
+        
+
+        # print(images_seq1.shape)
+        # print(images_seq2.shape)
+        # print(images_seq3.shape)
         #flat_imgs3 = images_seq3.view(T3 * N3, C3, H3, W3)
         #print(flat_imgs1.shape)
         
-        flat_imgs1 = self.resnet1(flat_imgs1)
-        flat_imgs2 = self.resnet2(flat_imgs2)
-        #flat_imgs3 = self.resnet3(flat_imgs3)
-        flat_imgs1 = flat_imgs1.view(N,T,  -1)#(N, T, d_r)
-        flat_imgs2 = flat_imgs2.view(N2,T2, -1)#(N2, T2, d_r)
-        #flat_imgs3 = flat_imgs3.view(T3, N3, -1)#(T, N, d_r)
-        #print(flat_imgs1.shape)
+        flat_imgs1 = self.conv1(images_seq1)
+        flat_imgs2 = self.conv2(images_seq2)
+        flat_imgs3 = self.conv3(images_seq3)
 
-        #print(obj_ids.shape)
-        obj_ids_embedding = self.embedding(obj_ids)
-        # print(obj_ids_embedding.shape)
-        # print(obj_ids.shape)
-        # print(state_seq.shape)
-        N,T,d_id,d_emb=obj_ids_embedding.shape
-        #print(obj_ids_embedding.shape)
-        embedding_flatten=obj_ids_embedding.view(N,T,d_id*d_emb)
-        #print(torch.cat([state_seq, embedding_flatten], dim=-1).shape)
-        state_proj = self.state_proj(torch.cat([state_seq, embedding_flatten], dim=-1))
-        #print(state_proj.shape)
-        transformer_out = self.transformer(state_proj) #(N, T, d_t)
-        #print(transformer_out.shape)
-
-
-
-        combined = torch.cat([transformer_out, flat_imgs1, flat_imgs2], dim=-1)  
-
-
-        lstm_out = self.lstm(combined)
-        final_out = lstm_out[:, -1, :] 
-
-        return final_out
+        flat_imgs1 = flat_imgs1.flatten(start_dim=1)
+        flat_imgs2 = flat_imgs2.flatten(start_dim=1)
+        flat_imgs3 = flat_imgs3.flatten(start_dim=1)
+        # print(flat_imgs1.shape)
+        # print(flat_imgs2.shape)
+        # print(flat_imgs3.shape)
+        # print(torch.cat([flat_imgs1, flat_imgs2, flat_imgs3], dim=-1).shape)
+        x = self.fc1(torch.cat([flat_imgs1, flat_imgs2, flat_imgs3], dim=-1))
+        x = self.fc2(x)
+        x = self.fc3(x)
+        x = self.fc4(x)
+        
+        
+        return x
     
