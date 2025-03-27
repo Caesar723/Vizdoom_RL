@@ -20,11 +20,11 @@ def get_state(game):
     small_map = state.automap_buffer
     map=state.screen_buffer
 
-    normalized_depth = image_process(depth_map)
-    normalized_small_map = image_process(small_map)
-    normalized_map = image_process(map)
+    normalized_depth = image_process(depth_map)/255
+    normalized_small_map = image_process(small_map)/255
+    normalized_map = image_process(map)/255
     #print(map.shape)
-    cropped_map = cv2.resize(map[:-75, 250:-250], (128, 128))
+    cropped_map = cv2.resize(map[:-75, 250:-250], (128, 128))/255
     return normalized_depth, cropped_map,normalized_map
 
 # 初始化 DoomGame

@@ -105,10 +105,10 @@ class PPO:
         self.gamma=0.99
         self.lambd=0.95
         self.clip_para=0.2
-        self.epochs=5
+        self.epochs=15
         self.max_step=3000000
         self.total_step=0
-        self.lr=1e-7
+        self.lr=1e-4
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")
         elif torch.cuda.is_available():
@@ -232,15 +232,15 @@ class PPO:
         next_images_seq3=torch.FloatTensor(np.array(self.next_images_seq3)).to(self.device).detach()
         reward=torch.FloatTensor(np.array(self.reward)).unsqueeze(1).to(self.device).detach()
 
-        print(images_seq1.shape)
-        print(images_seq2.shape)
-        print(images_seq3.shape)
-        print(action.shape)
-        print(done.shape)
-        print(next_images_seq1.shape)
-        print(next_images_seq2.shape)
-        print(next_images_seq3.shape)
-        print(reward.shape)
+        # print(images_seq1.shape)
+        # print(images_seq2.shape)
+        # print(images_seq3.shape)
+        # print(action.shape)
+        # print(done.shape)
+        # print(next_images_seq1.shape)
+        # print(next_images_seq2.shape)
+        # print(next_images_seq3.shape)
+        # print(reward.shape)
         # print(state.shape)
         # print(obj_ids.shape)
         # print(images_seq1.shape)
