@@ -121,7 +121,7 @@ class PPO:
             self.device = torch.device("cpu")
         
         self.model = ActorCritic(input_size_1=input_size_1,input_size_2=input_size_2,input_size_3=input_size_3,output_dim=output_dim).to(self.device)
-        #self.load_model("model_complete.pth")
+        self.load_model("model_complete_normal2.pth")
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, eps=1e-5)
         self.scheduler=StepLR(self.optimizer, step_size=200, gamma=0.99)
         self.MSEloss=nn.MSELoss()
@@ -221,6 +221,7 @@ class PPO:
         return np.array(advantage_list)
     
     def train(self):
+        #return 
         self.graph_on_rollout_end()
         images_seq1=torch.FloatTensor(np.array(self.images_seq1)).to(self.device).detach()
         images_seq2=torch.FloatTensor(np.array(self.images_seq2)).to(self.device).detach()

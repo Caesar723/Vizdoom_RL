@@ -35,7 +35,7 @@ game.load_config(vzd.scenarios_path + "/deadly_corridor.cfg")
 # 启用深度图
 game.set_available_game_variables([
     vzd.GameVariable.HEALTH,        # 血量
-    vzd.GameVariable.AMMO2, 
+    vzd.GameVariable.AMMO5, 
     vzd.GameVariable.KILLCOUNT
 ])
 game.set_screen_format(vzd.ScreenFormat.GRAY8)  # 设置屏幕格式为灰度
@@ -60,6 +60,7 @@ while True:
     # image2_list = []
     previous_kill_count = 0
     previous_health = 100
+    previous_ammo = game.get_game_variable(vzd.GameVariable.AMMO5)
     first_step = True
     
     while not game.is_episode_finished():
@@ -94,20 +95,22 @@ while True:
             #action = 0
         action_list = np.zeros(num_actions)
         action_list[action] = 1
-        reward = game.make_action(action_list)/2
+        reward_path = game.make_action(action_list)/2
         for _ in range(frame_repeat):
             game.advance_action()
         current_kill_count = game.get_game_variable(vzd.GameVariable.KILLCOUNT)
         current_health = game.get_game_variable(vzd.GameVariable.HEALTH)
+        current_ammo = game.get_game_variable(vzd.GameVariable.AMMO5)
         #print((current_kill_count - previous_kill_count) * 80)
         #print((current_health - previous_health) * 2)
         reward=0
-        reward += (current_kill_count - previous_kill_count) * 300
-        reward += -1
+        reward += (current_kill_count - previous_kill_count) * 1000
+        reward += reward_path*10
+        reward += (current_ammo - previous_ammo) * 100
         #reward += (current_health - previous_health) * 1
         previous_kill_count = current_kill_count
         previous_health = current_health
-        
+        previous_ammo = current_ammo
         
         done = game.is_episode_finished()
         if done and previous_health<=0:
