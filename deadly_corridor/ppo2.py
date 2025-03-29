@@ -221,7 +221,7 @@ class PPO:
         return np.array(advantage_list)
     
     def train(self):
-        #return 
+        return 
         self.graph_on_rollout_end()
         images_seq1=torch.FloatTensor(np.array(self.images_seq1)).to(self.device).detach()
         images_seq2=torch.FloatTensor(np.array(self.images_seq2)).to(self.device).detach()
@@ -334,9 +334,9 @@ class PPO:
     def graph_on_rollout_end(self) -> None:
         if self.best_mean_reward<self.rewards/self.step:
             self.best_mean_reward=self.rewards/self.step
-            torch.save(self.model, '/mnt/model_complete2.pth')
+            torch.save(self.model, 'model_complete2.pth')
             #torch.save(self.model_val, 'model_complete_val.pth')
-        torch.save(self.model, '/mnt/model_complete_normal2.pth')
+        torch.save(self.model, 'model_complete_normal2.pth')
         self.rewards_store.append(self.rewards)
         self.rewards = 0
         self.step=0
@@ -344,7 +344,7 @@ class PPO:
     
         self.ax.set_xlim(0, len(self.rewards_store))
         self.ax.set_ylim(min(self.rewards_store) - 5, max(self.rewards_store) + 5)
-        plt.savefig('/mnt/ppo_training_reward2.png')
+        plt.savefig('ppo_training_reward2.png')
         
     def graph_on_step(self,reward):
             self.step+=1

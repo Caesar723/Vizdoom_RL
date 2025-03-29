@@ -2,7 +2,7 @@ import vizdoom as vzd
 import numpy as np
 import cv2
 import torch
-import ppo2
+import deadly_corridor.ppo2 as ppo2
 
 
 def image_process(image):
@@ -43,7 +43,7 @@ game.set_depth_buffer_enabled(True)  # 启用深度缓冲区
 game.set_labels_buffer_enabled(True)
 game.set_automap_buffer_enabled(True)
 game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
-game.set_window_visible(False)
+#game.set_window_visible(False)
 game.init()
 
 num_actions=7
@@ -105,7 +105,7 @@ while True:
         #print((current_health - previous_health) * 2)
         reward=0
         reward += (current_kill_count - previous_kill_count) * 1000
-        reward += reward_path*10
+        reward += -20
         reward += (current_ammo - previous_ammo) * 100
         #reward += (current_health - previous_health) * 1
         previous_kill_count = current_kill_count
@@ -114,11 +114,15 @@ while True:
         
         done = game.is_episode_finished()
         if done and previous_health<=0:
-            reward=-1000
+            reward=-700
         elif done and previous_health>0:
             reward=1000
         
         reward = reward/1000
+
+        # print(reward)
+        # print(reward_path)
+        # print()
         if done:
             with torch.no_grad():
                 agent.store(
