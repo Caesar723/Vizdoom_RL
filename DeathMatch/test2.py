@@ -7,7 +7,7 @@ import vizdoom as vzd
 import numpy as np
 import cv2
 import torch
-
+import os
 from torch.nn.utils.rnn import pad_sequence
 import DeathMatch.ppo2 as ppo2
 
@@ -115,8 +115,8 @@ def state_iter(game):
 
 # 初始化 DoomGame
 game = vzd.DoomGame()
-print(vzd.scenarios_path)
-game.load_config("DeathMatch/myconfig.cfg")
+
+game.load_config(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))+"/DeathMatch/myconfig.cfg")
 
 # 启用深度图
 game.set_available_game_variables([

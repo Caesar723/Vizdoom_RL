@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 from torch.optim.lr_scheduler import StepLR
 import numpy as np
-
+import os
 import layers.normal_net as net
 import matplotlib.pyplot as plt
 import gc
@@ -301,11 +301,12 @@ class PPO:
         self.clean()
 
     def graph_on_rollout_end(self) -> None:
+        path=os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
         if self.best_mean_reward<self.rewards/self.step:
             self.best_mean_reward=self.rewards/self.step
-            torch.save(self.model, '/mnt/model_complete2.pth')
+            torch.save(self.model, path+'/model_complete2.pth')
             #torch.save(self.model_val, 'model_complete_val.pth')
-        torch.save(self.model, '/mnt/model_complete_normal2.pth')
+        torch.save(self.model, path+'/model_complete_normal2.pth')
         self.rewards_store.append(self.rewards)
         self.rewards = 0
         self.step=0
@@ -313,7 +314,7 @@ class PPO:
     
         self.ax.set_xlim(0, len(self.rewards_store))
         self.ax.set_ylim(min(self.rewards_store) - 5, max(self.rewards_store) + 5)
-        plt.savefig('/mnt/ppo_training_reward2.png')
+        plt.savefig(path+'/ppo_training_reward2.png')
         
     def graph_on_step(self,reward):
             self.step+=1
