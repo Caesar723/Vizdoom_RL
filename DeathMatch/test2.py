@@ -131,7 +131,7 @@ game.set_labels_buffer_enabled(True)
 game.set_automap_buffer_enabled(True)
 
 game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
-#game.set_window_visible(False)
+game.set_window_visible(False)
 game.init()
 
 
