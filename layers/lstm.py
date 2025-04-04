@@ -5,9 +5,9 @@ import torch.nn as nn
 
 
 
-class LSTM(nn.Module):
+class GRU(nn.Module):
     def __init__(self, input_size, hidden_size):
-        super(LSTM, self).__init__()
+        super().__init__()
         self.W_x = nn.Linear(input_size, 3 * hidden_size)
         self.W_h = nn.Linear(hidden_size, 2 * hidden_size)
         self.W_h2 = nn.Linear(hidden_size, 1 * hidden_size)

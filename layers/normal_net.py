@@ -6,7 +6,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from layers.setTransfer import SetTransformer
-from layers.lstm import LSTM
+from layers.lstm import GRU
 
 
 class LabelEncoder(nn.Module):
@@ -41,13 +41,16 @@ class NormalNet(nn.Module):
         super().__init__()
         self.hidden_size=hidden_size
 
-        self.lstm=LSTM(label_size,hidden_size)
+        self.lstm=GRU(label_size,hidden_size)
 
         self.state_encoder=nn.Sequential(
             nn.Linear(2, hidden_size),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.LayerNorm(hidden_size)
         )
         self.label_encoder=LabelEncoder(14, hidden_size)
+        self.label_norm = nn.LayerNorm(hidden_size)
+
         self.conv=nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1),
             nn.ReLU(),
@@ -68,32 +71,52 @@ class NormalNet(nn.Module):
         )
         
         self.image_linear=nn.Linear(image_size//8*image_size//8*128,1024)
-        self.fc1 = nn.Linear(hidden_size*2, 512)
-        self.fc2 = nn.Linear(1024+512, 512)
-        self.fc3 = nn.Linear(512, 256)
-        self.fc4 = nn.Linear(256, 128)
-
-
+        self.image_norm = nn.LayerNorm(1024)
+        self.fc1 = nn.Sequential(
+            nn.Linear(hidden_size*2, 512),
+            nn.LayerNorm(512),
+            nn.Tanh()
+            
+        )
+        self.fc2 = nn.Sequential(
+            nn.Linear(1024+512, 512),
+            nn.LayerNorm(512),
+            nn.Tanh()
+            
+        )
+        self.fc3 = nn.Sequential(
+            nn.Linear(512, 256),
+            nn.LayerNorm(256),
+            nn.Tanh()
+        )
+        self.fc4 = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.LayerNorm(128),
+            nn.Tanh()
+        )
     def forward(self, state, label_tensor,images_seq1):
         # print(label_tensor.shape)
         B,T,L=label_tensor.size()
         
         
         label_tensor=self.lstm(label_tensor)[:,-1,:]
+        label_tensor=self.label_norm(label_tensor)
         
         state=self.state_encoder(state)
+        
         
 
         
         images_seq1=self.conv(images_seq1)
         images_seq1=images_seq1.flatten(start_dim=1)
         images_seq1=self.image_linear(images_seq1)
+        images_seq1=self.image_norm(images_seq1)
 
         
         x=torch.cat([state,label_tensor],dim=-1)
-        x=torch.tanh(self.fc1(x))
-        x=torch.tanh(self.fc2(torch.cat([x,images_seq1],dim=-1)))
-        x=torch.tanh(self.fc3(x))
+        x=self.fc1(x)
+        x=self.fc2(torch.cat([x,images_seq1],dim=-1))
+        x=self.fc3(x)
         x=self.fc4(x)
         return x
 

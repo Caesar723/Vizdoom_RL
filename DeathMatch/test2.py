@@ -90,8 +90,8 @@ def get_state(game):
         
     for class_tuple in all_class:
         while len(class_tuple[1])<class_tuple[2]:
-            class_tuple[1].append(-1)
-            class_tuple[1].append(-1)
+            class_tuple[1].append(0)
+            class_tuple[1].append(0)
         #labels.append(element)
         
         
@@ -114,7 +114,7 @@ def get_state(game):
     labels=[]
     for class_tuple in all_class:
         labels+=class_tuple[1]
-    labels=torch.FloatTensor(np.array(labels))
+    labels=torch.FloatTensor(np.array(labels)/500)
     
     return normalized_depth,labels,normal_state
 
@@ -135,10 +135,10 @@ def pad_labels(labels_cache):
 
 def state_iter(game):
     labels_cache=[]
-    for i in range(10):
+    for i in range(50):
         normalized_depth, labels,normal_state = get_state(game)
         labels_cache.append(labels)
-        game.advance_action()
+        #game.advance_action()
         #yield None
     
     #labels_pad,mask=pad_labels(labels_cache)
@@ -170,17 +170,17 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     reward += (current_kill_count - previous_kill_count) * 1000
     reward += -20
     reward += (current_ammo - previous_ammo) * 100
-    if current_health>previous_health:
-        reward += (current_health - previous_health) * 10
+    #if current_health>previous_health:
+    reward += (current_health - previous_health) * 1
     previous_kill_count = current_kill_count
     previous_health = current_health
     previous_ammo = current_ammo
     
     done = game.is_episode_finished()
     if done and previous_health<=0:
-        reward=-700
-    elif done and previous_health>0:
-        reward=1000
+        reward=-10000
+    # elif done and previous_health>0:
+    #     reward=1000
     
     reward = reward/1000
     return reward,done,current_kill_count,current_health,current_ammo
