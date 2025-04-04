@@ -18,9 +18,9 @@ def orthogonal_init(layer, gain=1.0):
     nn.init.constant_(layer.bias, 0)
 
 class ActorCritic(nn.Module):
-    def __init__(self,image_size,output_dim):
+    def __init__(self,image_size,label_size,output_dim):
         super().__init__()
-        self.net = net.NormalNet(hidden_size=128,image_size=image_size)
+        self.net = net.NormalNet(hidden_size=128,image_size=image_size,label_size=label_size)
         self.softmax = nn.Softmax(dim=-1)
         self.critic = nn.Linear(128, 1)
         self.actor = nn.Linear(128, output_dim)
@@ -29,12 +29,12 @@ class ActorCritic(nn.Module):
         orthogonal_init(self.critic)
         orthogonal_init(self.actor,gain=0.01)
 
-    def forward(self, state, label_tensor,images_seq1,mask):
+    def forward(self, state, label_tensor,images_seq1):
         # print("images_seq1.shape:",images_seq1.shape,images_seq1)
         # print("images_seq2.shape:",images_seq2.shape,images_seq2)
         # print("state_seq.shape:",state_seq.shape,state_seq)
         # print("obj_ids.shape:",obj_ids.shape,obj_ids)
-        x = self.net(state, label_tensor,images_seq1,mask)
+        x = self.net(state, label_tensor,images_seq1)
         value = self.critic(x)
         
         action_prob = self.softmax(self.actor(x))
@@ -101,14 +101,14 @@ class RewardScaling:#Trick 4—Reward Scaling
 class PPO:
     
 
-    def __init__(self,input_size,output_dim):#input_dim: state
+    def __init__(self,input_size,label_size,output_dim):#input_dim: state
         self.gamma=0.99
         self.lambd=0.95
         self.clip_para=0.2
         self.epochs=15
         self.max_step=3000000
         self.total_step=0
-        self.lr=1e-4
+        self.lr=1e-5
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")
         elif torch.cuda.is_available():
@@ -120,7 +120,7 @@ class PPO:
         else:
             self.device = torch.device("cpu")
         
-        self.model = ActorCritic(image_size=input_size,output_dim=output_dim).to(self.device)
+        self.model = ActorCritic(image_size=input_size,label_size=label_size,output_dim=output_dim).to(self.device)
         #self.load_model("model_complete_normal2.pth")
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, eps=1e-5)
         self.scheduler=StepLR(self.optimizer, step_size=200, gamma=0.99)
@@ -162,25 +162,23 @@ class PPO:
     def normalize_adv(self,adv:torch.Tensor):
         return ((adv - adv.mean()) / (adv.std() + 1e-5))
     
-    def choose_act(self,images_seq,labels,state,mask):
+    def choose_act(self,images_seq,labels,state):
         images_seq = images_seq.to(self.device)
         labels = labels.to(self.device)
         state = state.to(self.device)
-        mask = mask.to(self.device)
         with torch.no_grad():
-            value, action_prob, dist, entropy = self.model(state,labels,images_seq,mask)
+            value, action_prob, dist, entropy = self.model(state,labels,images_seq)
             action = dist.sample()
             #action_log_prob = dist.log_prob(action)
         
         return action.item()
     
-    def store(self,images_seq,labels,state,mask,action,reward,next_images_seq,next_labels,next_state,next_mask,done):
+    def store(self,images_seq,labels,state,action,reward,next_images_seq,next_labels,next_state,done):
         self.graph_on_step(reward)
         
         self.images_seq.append(images_seq)
         self.labels.append(labels)
         self.state.append(state)
-        self.mask.append(mask)
         self.action.append(action)
         #reward=self.reward_scale(reward)
         self.reward.append(reward)
@@ -188,7 +186,6 @@ class PPO:
         self.next_images_seq.append(next_images_seq)
         self.next_labels.append(next_labels)
         self.next_state.append(next_state)
-        self.next_mask.append(next_mask)
         
 
     
@@ -196,13 +193,12 @@ class PPO:
         self.images_seq=[]
         self.labels=[]
         self.state=[]
-        self.mask=[]
+        
         self.action=[]
         self.reward=[]
         self.next_images_seq=[]
         self.next_labels=[]
         self.next_state=[]
-        self.next_mask=[]
         self.done=[]
         self.reward_scale.reset()
         
@@ -233,19 +229,17 @@ class PPO:
         images_seq=torch.FloatTensor(np.array(self.images_seq)).to(self.device).detach()
         labels=torch.FloatTensor(np.array(self.labels)).to(self.device).detach()
         state=torch.FloatTensor(np.array(self.state)).to(self.device).detach()
-        mask=torch.BoolTensor(np.array(self.mask)).to(self.device).detach()
         action=torch.LongTensor(np.array(self.action)).unsqueeze(1).to(self.device).detach()
         done=torch.FloatTensor(np.array(self.done)).unsqueeze(1).to(self.device).detach()
         next_images_seq=torch.FloatTensor(np.array(self.next_images_seq)).to(self.device).detach()
         next_labels=torch.FloatTensor(np.array(self.next_labels)).to(self.device).detach()
         next_state=torch.FloatTensor(np.array(self.next_state)).to(self.device).detach()
-        next_mask=torch.BoolTensor(np.array(self.next_mask)).to(self.device).detach()
         reward=torch.FloatTensor(np.array(self.reward)).unsqueeze(1).to(self.device).detach()
 
        
         with torch.no_grad():
-            v, _, dist,_ = self.model(state,labels,images_seq,mask)
-            v_, _, _, _ = self.model(next_state,next_labels,next_images_seq,next_mask)
+            v, _, dist,_ = self.model(state,labels,images_seq)
+            v_, _, _, _ = self.model(next_state,next_labels,next_images_seq)
             delta=reward+self.gamma*v_*(1-done)-v
             advantage=self.advantage_cal(delta,done)
             advantage=torch.FloatTensor(advantage).detach().to(self.device)
@@ -266,7 +260,6 @@ class PPO:
                 images_seq_batch=images_seq[i:i+batch_size]
                 labels_batch=labels[i:i+batch_size]
                 state_batch=state[i:i+batch_size]
-                mask_batch=mask[i:i+batch_size]
                 action_batch=action[i:i+batch_size]
                 
                 advantage_batch=advantage[i:i+batch_size]
@@ -276,7 +269,7 @@ class PPO:
 
 
                 
-                v, _, dist,entropy = self.model(state_batch,labels_batch,images_seq_batch,mask_batch)
+                v, _, dist,entropy = self.model(state_batch,labels_batch,images_seq_batch)
                 new_prob_log=dist.log_prob(action_batch.squeeze(-1))
                 
                 rate=torch.exp(new_prob_log-action_log_prob_batch.detach()).unsqueeze(1)

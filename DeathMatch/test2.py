@@ -48,20 +48,51 @@ def get_state(game):
         "BlueArmor":12,
         "ArmorBonus":13
     }
-    labels=[[   0,  -82,   62,  163,  100]]
+    class_opponent=[
+        "DoomPlayer",
+        "Rocket",
+        "ShotgunGuy",
+        "MarineChainsawVzd",
+        "Zombieman",
+    ]
+    class_buff=[
+        "HealthBonus",
+        "GreenArmor",
+        "BlueArmor",
+        "ArmorBonus"
+    ]
+    class_ammo=[
+        "Rocket"
+    ]
+    all_class=[
+        (class_opponent,[],10),
+        (class_buff,[],10),
+        (class_ammo,[],4)
+    ]
+    #labels=[[   0,  -82,   62,  163,  100]]
     
     for i in state.labels:
         if i.object_name not in keeped_ids:
             continue
-        element=[
-            keeped_ids[i.object_name],
-            i.x - state.screen_buffer.shape[1] // 2,
-            i.y - state.screen_buffer.shape[0] // 2,
-            i.width,
-            i.height
-        ]
         
-        labels.append(element)
+        element=[
+            
+            i.x+i.width//2, #- state.screen_buffer.shape[1] // 2,
+            i.y+i.height//2, #- state.screen_buffer.shape[0] // 2,
+            
+        ]
+        for class_tuple in all_class:
+            if i.object_name in class_tuple[0]:
+                if len(class_tuple[1])<class_tuple[2]:
+                    class_tuple[1].append(element[0])
+                    class_tuple[1].append(element[1])
+                break
+        
+    for class_tuple in all_class:
+        while len(class_tuple[1])<class_tuple[2]:
+            class_tuple[1].append(-1)
+            class_tuple[1].append(-1)
+        #labels.append(element)
         
         
     
@@ -79,8 +110,13 @@ def get_state(game):
         game.get_game_variable(vzd.GameVariable.HEALTH),
         game.get_game_variable(vzd.GameVariable.AMMO2)
     ]
+
+    labels=[]
+    for class_tuple in all_class:
+        labels+=class_tuple[1]
+    labels=torch.FloatTensor(np.array(labels))
     
-    return normalized_depth,torch.tensor(labels),normal_state
+    return normalized_depth,labels,normal_state
 
 
 def pad_labels(labels_cache):
@@ -99,20 +135,55 @@ def pad_labels(labels_cache):
 
 def state_iter(game):
     labels_cache=[]
-    for i in range(5):
+    for i in range(10):
         normalized_depth, labels,normal_state = get_state(game)
         labels_cache.append(labels)
         game.advance_action()
         #yield None
-    labels_pad,mask=pad_labels(labels_cache)
+    
+    #labels_pad,mask=pad_labels(labels_cache)
 
+    #normalized_depth, labels,normal_state = get_state(game)
     while True:
-        yield normalized_depth, labels_pad,normal_state,mask
+        
+        
+        #labels_pad=pad_or_truncate(labels, 25)
+        
+        #mask = torch.arange(labels_pad.shape[0])[None, :] < min(labels.size(0),25)
+        # print(mask.shape)
+        # print(labels_pad.shape)
+        # print(mask)
+        tensor_labels=torch.stack(labels_cache)
+        #print(tensor_labels)
+        yield normalized_depth, tensor_labels,normal_state
         normalized_depth, labels,normal_state = get_state(game)
         labels_cache.pop(0)
         labels_cache.append(labels)
-        labels_pad,mask=pad_labels(labels_cache)
+        
+        #labels_pad,mask=pad_labels(labels_cache)
 
+def get_reward(game,previous_kill_count,previous_health,previous_ammo):
+    current_kill_count = game.get_game_variable(vzd.GameVariable.KILLCOUNT)
+    current_health = game.get_game_variable(vzd.GameVariable.HEALTH)
+    current_ammo = game.get_game_variable(vzd.GameVariable.AMMO5)
+    reward=0
+    reward += (current_kill_count - previous_kill_count) * 1000
+    reward += -20
+    reward += (current_ammo - previous_ammo) * 100
+    if current_health>previous_health:
+        reward += (current_health - previous_health) * 10
+    previous_kill_count = current_kill_count
+    previous_health = current_health
+    previous_ammo = current_ammo
+    
+    done = game.is_episode_finished()
+    if done and previous_health<=0:
+        reward=-700
+    elif done and previous_health>0:
+        reward=1000
+    
+    reward = reward/1000
+    return reward,done,current_kill_count,current_health,current_ammo
 # 初始化 DoomGame
 game = vzd.DoomGame()
 
@@ -136,7 +207,7 @@ game.init()
 
 
 num_actions=9
-agent = ppo2.PPO(input_size=128,output_dim=num_actions)
+agent = ppo2.PPO(input_size=128,label_size=24,output_dim=num_actions)
 
 frame_repeat=10
 step=1
@@ -161,72 +232,64 @@ while True:
     # while next_state is None:
     #     next_state=next(state_iter)
 
-    normalized_depth, labels_pad,normal_state,mask=next_state
+    normalized_depth, labels,normal_state=next_state
     # print(normalized_depth.shape)
     # print(labels_pad.shape)
     # print(normal_state)
     # print(mask.shape)
     # exit()
+   
     
     while not game.is_episode_finished():
         game.send_game_command("give ammo")
-        #print(game.get_ticrate())
-        # 获取深度图
-        #if step%7==0:
         
-        #if len(state_list) == agent.warmup_steps:
         step+=1
-        #normalized_depth, cropped_map,normalized_map,labels,normal_state = get_state(game)
-        # print(normalized_depth.shape)
-        # print(cropped_map.shape)
-        # print(normalized_map.shape)
-        # print(normalized_depth)
-        # print(cropped_map)
-        #print((cropped_map*255).astype(np.uint8))
-        # cv2.imshow("cropped_map",cropped_map)
-        # cv2.imshow("cropped_map2",np.round((cropped_map.astype(np.float32)/255*255).astype(np.uint8)))
-        # cv2.imshow("normalized_map",normalized_map)
         
         with torch.no_grad():
             if first_step:
                 torch_image1_list = torch.tensor(normalized_depth, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
                 normal_state_list = torch.tensor(normal_state, dtype=torch.float32).unsqueeze(0)
-                labels_pad_list = labels_pad.unsqueeze(0)
-                mask_list = mask.unsqueeze(0)
+                labels_list = labels.unsqueeze(0)
+                #print(labels_list.shape)
+                
                 
                 
                 
         
         
-            action =agent.choose_act(torch_image1_list, labels_pad_list, normal_state_list,mask_list)
+            action =agent.choose_act(torch_image1_list, labels_list, normal_state_list)
             #action = 3
         action_list = np.zeros(num_actions)
         action_list[action] = 1
         reward_path = game.make_action(action_list)/2
         for _ in range(frame_repeat):
             game.advance_action()
-        current_kill_count = game.get_game_variable(vzd.GameVariable.KILLCOUNT)
-        current_health = game.get_game_variable(vzd.GameVariable.HEALTH)
-        current_ammo = game.get_game_variable(vzd.GameVariable.AMMO5)
+        # current_kill_count = game.get_game_variable(vzd.GameVariable.KILLCOUNT)
+        # current_health = game.get_game_variable(vzd.GameVariable.HEALTH)
+        # current_ammo = game.get_game_variable(vzd.GameVariable.AMMO5)
         #print((current_kill_count - previous_kill_count) * 80)
         #print((current_health - previous_health) * 2)
-        reward=0
-        reward += (current_kill_count - previous_kill_count) * 1000
-        reward += -20
-        reward += (current_ammo - previous_ammo) * 100
-        #reward += (current_health - previous_health) * 1
+        # reward=0
+        # reward += (current_kill_count - previous_kill_count) * 1000
+        # reward += -20
+        # reward += (current_ammo - previous_ammo) * 100
+        # #reward += (current_health - previous_health) * 1
+        # previous_kill_count = current_kill_count
+        # previous_health = current_health
+        # previous_ammo = current_ammo
+        
+        # done = game.is_episode_finished()
+        # if done and previous_health<=0:
+        #     reward=-700
+        # elif done and previous_health>0:
+        #     reward=1000
+        
+        # reward = reward/1000
+
+        reward,done,current_kill_count,current_health,current_ammo=get_reward(game,previous_kill_count,previous_health,previous_ammo)
         previous_kill_count = current_kill_count
         previous_health = current_health
         previous_ammo = current_ammo
-        
-        done = game.is_episode_finished()
-        if done and previous_health<=0:
-            reward=-700
-        elif done and previous_health>0:
-            reward=1000
-        
-        reward = reward/1000
-
         # print(reward)
         # print(reward_path)
         # print()
@@ -235,16 +298,17 @@ while True:
                 agent.store(
                     
                     torch_image1_list.squeeze(0), 
-                    labels_pad_list.squeeze(0), 
+                    labels.squeeze(0), 
                     normal_state_list.squeeze(0),
-                    mask_list.squeeze(0),
+                    
                     action,
                     reward,
                     
                     torch_image1_list.squeeze(0), 
-                    labels_pad_list.squeeze(0), 
+                    labels.squeeze(0), 
                     normal_state_list.squeeze(0),
-                    mask_list.squeeze(0),
+                    
+                    
                     done
                     )
                 
@@ -255,28 +319,27 @@ while True:
         
         
 
-        next_normalized_depth, next_labels_pad,next_normal_state,next_mask=next(state_getter)
+        next_normalized_depth, next_labels,next_normal_state=next(state_getter)
         
         
         
         with torch.no_grad():
             next_torch_image1_list = torch.tensor(next_normalized_depth, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
             next_normal_state_list = torch.tensor(next_normal_state, dtype=torch.float32).unsqueeze(0)
-            next_labels_pad_list = next_labels_pad.unsqueeze(0)
-            next_mask_list = next_mask.unsqueeze(0)
+            next_labels_list = next_labels.unsqueeze(0)
+            
             
             agent.store(
-                
                 torch_image1_list.squeeze(0), 
-                labels_pad_list.squeeze(0), 
+                labels_list.squeeze(0), 
                 normal_state_list.squeeze(0),
-                mask_list.squeeze(0),
+                
                 action,
                 reward,
                 next_torch_image1_list.squeeze(0),
-                next_labels_pad_list.squeeze(0),
+                next_labels_list.squeeze(0),
                 next_normal_state_list.squeeze(0),
-                next_mask_list.squeeze(0),
+                
                 done
                 )
             
@@ -286,9 +349,10 @@ while True:
             break
             
         normalized_depth=next_normalized_depth
-        labels_pad=next_labels_pad
+        labels=next_labels
         normal_state=next_normal_state
-        mask=next_mask
+        
+        
         
         
             

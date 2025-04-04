@@ -18,7 +18,7 @@ class LabelEncoder(nn.Module):
         self.class_embed = nn.Embedding(num_classes, embed_dim)
         self.bbox_mlp = nn.Sequential(
             nn.Linear(4, embed_dim),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.Linear(embed_dim, embed_dim)
         )
         self.set_transformer = SetTransformer(embed_dim*2, embed_dim)
@@ -37,11 +37,11 @@ class LabelEncoder(nn.Module):
         return self.set_transformer(label_vec,mask)           # [B, D]
 
 class NormalNet(nn.Module):
-    def __init__(self,hidden_size=128,image_size=128):
+    def __init__(self,label_size,hidden_size=128,image_size=128):
         super().__init__()
         self.hidden_size=hidden_size
 
-        self.lstm=LSTM(hidden_size,hidden_size)
+        self.lstm=LSTM(label_size,hidden_size)
 
         self.state_encoder=nn.Sequential(
             nn.Linear(2, hidden_size),
@@ -66,6 +66,7 @@ class NormalNet(nn.Module):
             
             
         )
+        
         self.image_linear=nn.Linear(image_size//8*image_size//8*128,1024)
         self.fc1 = nn.Linear(hidden_size*2, 512)
         self.fc2 = nn.Linear(1024+512, 512)
@@ -73,34 +74,26 @@ class NormalNet(nn.Module):
         self.fc4 = nn.Linear(256, 128)
 
 
-    def forward(self, state, label_tensor,images_seq1,mask=None):
-        print(label_tensor.shape)
-        B,T,N,L=label_tensor.size()
+    def forward(self, state, label_tensor,images_seq1):
+        # print(label_tensor.shape)
+        B,T,L=label_tensor.size()
         
-        label_tensor=label_tensor.view(T*B,N,L)
-        print(label_tensor.shape)
-        mask=mask.view(T*B,N)
-        label_tensor=self.label_encoder(label_tensor,mask)
-        label_tensor=label_tensor.view(B,T,self.hidden_size)
-        print(label_tensor.shape)
+        
         label_tensor=self.lstm(label_tensor)[:,-1,:]
-        print(label_tensor.shape)
-        print(state.shape)
+        
         state=self.state_encoder(state)
-        print(state.shape)
+        
 
         
         images_seq1=self.conv(images_seq1)
         images_seq1=images_seq1.flatten(start_dim=1)
         images_seq1=self.image_linear(images_seq1)
 
-        print(state.shape)
-        print(label_tensor.shape)
-        print(images_seq1.shape)
+        
         x=torch.cat([state,label_tensor],dim=-1)
-        x=self.fc1(x)
-        x=self.fc2(torch.cat([x,images_seq1],dim=-1))
-        x=self.fc3(x)
+        x=torch.tanh(self.fc1(x))
+        x=torch.tanh(self.fc2(torch.cat([x,images_seq1],dim=-1)))
+        x=torch.tanh(self.fc3(x))
         x=self.fc4(x)
         return x
 
