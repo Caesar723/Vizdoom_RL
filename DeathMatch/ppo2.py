@@ -108,7 +108,7 @@ class PPO:
         self.epochs=15
         self.max_step=3000000
         self.total_step=0
-        self.lr=1e-4
+        self.lr=5e-5
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")
         elif torch.cuda.is_available():

@@ -65,9 +65,9 @@ def get_state(game):
         "Rocket"
     ]
     all_class=[
-        (class_opponent,[],10),
-        (class_buff,[],10),
-        (class_ammo,[],4)
+        (class_opponent,[],20),
+        (class_buff,[],20),
+        (class_ammo,[],8)
     ]
     #labels=[[   0,  -82,   62,  163,  100]]
     
@@ -79,17 +79,22 @@ def get_state(game):
             
             i.x+i.width//2, #- state.screen_buffer.shape[1] // 2,
             i.y+i.height//2, #- state.screen_buffer.shape[0] // 2,
-            
+            i.width,
+            i.height
         ]
         for class_tuple in all_class:
             if i.object_name in class_tuple[0]:
                 if len(class_tuple[1])<class_tuple[2]:
                     class_tuple[1].append(element[0])
                     class_tuple[1].append(element[1])
+                    class_tuple[1].append(element[2])
+                    class_tuple[1].append(element[3])
                 break
         
     for class_tuple in all_class:
         while len(class_tuple[1])<class_tuple[2]:
+            class_tuple[1].append(0)
+            class_tuple[1].append(0)
             class_tuple[1].append(0)
             class_tuple[1].append(0)
         #labels.append(element)
@@ -207,7 +212,7 @@ game.init()
 
 
 num_actions=9
-agent = ppo2.PPO(input_size=128,label_size=24,output_dim=num_actions)
+agent = ppo2.PPO(input_size=128,label_size=48,output_dim=num_actions)
 
 frame_repeat=10
 step=1
