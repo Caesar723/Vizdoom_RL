@@ -41,7 +41,7 @@ class NormalNet(nn.Module):
         super().__init__()
         self.hidden_size=hidden_size
 
-        self.lstm=GRU(label_size,hidden_size)
+        self.lstm=GRU(hidden_size,hidden_size)
 
         self.state_encoder=nn.Sequential(
             nn.Linear(2, hidden_size),
@@ -49,6 +49,12 @@ class NormalNet(nn.Module):
             nn.LayerNorm(hidden_size)
         )
         self.label_encoder=LabelEncoder(14, hidden_size)
+
+        self.label_mlp=nn.Sequential(
+            nn.Linear(label_size,hidden_size),
+            nn.ReLU(),
+            nn.LayerNorm(hidden_size)
+        )
         self.label_norm = nn.LayerNorm(hidden_size)
 
         self.conv=nn.Sequential(
@@ -97,8 +103,10 @@ class NormalNet(nn.Module):
     def forward(self, state, label_tensor,images_seq1):
         # print(label_tensor.shape)
         B,T,L=label_tensor.size()
-        
-        
+        label_tensor=label_tensor.view(B*T,L)
+        #print(label_tensor.shape)
+        label_tensor=self.label_mlp(label_tensor)
+        label_tensor=label_tensor.view(B,T,-1)
         label_tensor=self.lstm(label_tensor)[:,-1,:]
         label_tensor=self.label_norm(label_tensor)
         

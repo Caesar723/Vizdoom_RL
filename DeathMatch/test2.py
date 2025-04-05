@@ -172,7 +172,7 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     current_health = game.get_game_variable(vzd.GameVariable.HEALTH)
     current_ammo = game.get_game_variable(vzd.GameVariable.AMMO5)
     reward=0
-    reward += (current_kill_count - previous_kill_count) * 1000
+    reward += (current_kill_count - previous_kill_count) * 5000
     reward += -20
     reward += (current_ammo - previous_ammo) * 100
     #if current_health>previous_health:
@@ -183,7 +183,7 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     
     done = game.is_episode_finished()
     if done and previous_health<=0:
-        reward=-10000
+        reward=-2000
     # elif done and previous_health>0:
     #     reward=1000
     
