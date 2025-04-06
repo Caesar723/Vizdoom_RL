@@ -35,10 +35,7 @@ class GRU(nn.Module):
             
         
 if __name__ == "__main__":
-    lstm = LSTM(128, 128)
-    x = torch.randn(4, 10, 128)
-    output = lstm(x)
-    print(output.shape)
+    pass
 
 
 

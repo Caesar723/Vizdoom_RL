@@ -69,9 +69,9 @@ def get_state(game):
         "Rocket"
     ]
     all_class=[
-        (class_opponent,[],5),
-        (class_buff,[],5),
-        (class_ammo,[],2)
+        (class_opponent,[],10),
+        #(class_buff,[],5),
+        (class_ammo,[],1)
     ]
     # player_number=game.get_game_variable(vzd.GameVariable.PLAYER_NUMBER)
     # print(player_number)
@@ -83,8 +83,8 @@ def get_state(game):
         
         element=[
             
-            i.x+i.width//2, #- state.screen_buffer.shape[1] // 2,
-            i.y+i.height//2, #- state.screen_buffer.shape[0] // 2,
+            i.x+i.width//2- state.screen_buffer.shape[1] // 2,
+            i.y+i.height//2- state.screen_buffer.shape[0] // 2,
             i.width,
             i.height
         ]
@@ -144,9 +144,10 @@ def get_state(game):
         class_tuple[1].sort(key=sort_labels,reverse=True)
         
         for x in class_tuple[1]:
-            labels+=x 
+            labels+=x[:2]
     
-    labels=torch.FloatTensor(np.array(labels)/500)
+    labels=torch.FloatTensor(np.array(labels)/100)
+    #print(labels)
     
     return normalized_depth,labels,normal_state
 
@@ -201,10 +202,10 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     reward=0
     reward += (current_kill_count - previous_kill_count) * 1000
     reward += -20
-    reward += (current_ammo - previous_ammo) * 100
+    if current_ammo<previous_ammo:
+        reward += (current_ammo - previous_ammo) * 100
     #if current_health>previous_health:
     reward += (current_health - previous_health) * 1
-    #print((current_ammo , previous_ammo))
     
     previous_kill_count = current_kill_count
     previous_health = current_health
@@ -244,7 +245,7 @@ game.init()
 
 
 num_actions=9
-agent = ppo2.PPO(input_size=128,label_size=48,output_dim=num_actions)
+agent = ppo2.PPO(input_size=128,label_size=22,output_dim=num_actions)
 
 frame_repeat=10
 step=1
