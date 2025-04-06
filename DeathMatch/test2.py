@@ -49,11 +49,15 @@ def get_state(game):
         "ArmorBonus":13
     }
     class_opponent=[
-        "DoomPlayer",
-        "Rocket",
+        # "DoomPlayer",
         "ShotgunGuy",
         "MarineChainsawVzd",
         "Zombieman",
+        "ChaingunGuy",
+        "Demon",
+        "HellKnight",
+        "Medikit",
+        "Stimpack"
     ]
     class_buff=[
         "HealthBonus",
@@ -65,10 +69,12 @@ def get_state(game):
         "Rocket"
     ]
     all_class=[
-        (class_opponent,[],20),
-        (class_buff,[],20),
-        (class_ammo,[],8)
+        (class_opponent,[],5),
+        (class_buff,[],5),
+        (class_ammo,[],2)
     ]
+    # player_number=game.get_game_variable(vzd.GameVariable.PLAYER_NUMBER)
+    # print(player_number)
     #labels=[[   0,  -82,   62,  163,  100]]
     
     for i in state.labels:
@@ -85,24 +91,39 @@ def get_state(game):
         for class_tuple in all_class:
             if i.object_name in class_tuple[0]:
                 if len(class_tuple[1])<class_tuple[2]:
-                    class_tuple[1].append(element[0])
-                    class_tuple[1].append(element[1])
-                    class_tuple[1].append(element[2])
-                    class_tuple[1].append(element[3])
+                    class_tuple[1].append(element)
+                    # class_tuple[1].append(element[1])
+                    # class_tuple[1].append(element[2])
+                    # class_tuple[1].append(element[3])
                 break
         
     for class_tuple in all_class:
         while len(class_tuple[1])<class_tuple[2]:
-            class_tuple[1].append(0)
-            class_tuple[1].append(0)
-            class_tuple[1].append(0)
-            class_tuple[1].append(0)
+            class_tuple[1].append([0,0,0,0])
+            # class_tuple[1].append(0)
+            # class_tuple[1].append(0)
+            # class_tuple[1].append(0)
         #labels.append(element)
-        
+    
+    #print(all_class)
         
     
     
     depth_map = state.depth_buffer
+    # for label in state.labels:
+    #     if label.object_name in class_opponent :
+    #         if label.object_name=="DoomPlayer":
+    #             print(label.object_id)
+    #         if label.object_id==player_number and label.object_name=="DoomPlayer":
+    #             continue
+    #         cv2.rectangle(depth_map, (label.x, label.y), (label.x + label.width, label.y + label.height), (155, 0, 0), 2)
+    #     if label.object_name in class_buff:
+    #         cv2.rectangle(depth_map, (label.x, label.y), (label.x + label.width, label.y + label.height), (255, 0, 0), 2)
+    #     if label.object_name in class_ammo:
+    #         cv2.rectangle(depth_map, (label.x, label.y), (label.x + label.width, label.y + label.height), (55, 0, 0), 2)
+        
+    # cv2.imshow("depth_map",depth_map)
+    # cv2.waitKey(0)
     # small_map = state.automap_buffer
     # map=state.screen_buffer
 
@@ -117,8 +138,14 @@ def get_state(game):
     ]
 
     labels=[]
+    sort_labels=lambda x:x[2]+x[3]
     for class_tuple in all_class:
-        labels+=class_tuple[1]
+        
+        class_tuple[1].sort(key=sort_labels,reverse=True)
+        
+        for x in class_tuple[1]:
+            labels+=x 
+    
     labels=torch.FloatTensor(np.array(labels)/500)
     
     return normalized_depth,labels,normal_state
@@ -140,7 +167,7 @@ def pad_labels(labels_cache):
 
 def state_iter(game):
     labels_cache=[]
-    for i in range(50):
+    for i in range(15):
         normalized_depth, labels,normal_state = get_state(game)
         labels_cache.append(labels)
         #game.advance_action()
@@ -172,22 +199,26 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     current_health = game.get_game_variable(vzd.GameVariable.HEALTH)
     current_ammo = game.get_game_variable(vzd.GameVariable.AMMO5)
     reward=0
-    reward += (current_kill_count - previous_kill_count) * 5000
+    reward += (current_kill_count - previous_kill_count) * 1000
     reward += -20
     reward += (current_ammo - previous_ammo) * 100
     #if current_health>previous_health:
     reward += (current_health - previous_health) * 1
+    #print((current_ammo , previous_ammo))
+    
     previous_kill_count = current_kill_count
     previous_health = current_health
     previous_ammo = current_ammo
     
     done = game.is_episode_finished()
+    
     if done and previous_health<=0:
-        reward=-2000
+        reward=-1000
     # elif done and previous_health>0:
     #     reward=1000
     
     reward = reward/1000
+    print(reward)
     return reward,done,current_kill_count,current_health,current_ammo
 # 初始化 DoomGame
 game = vzd.DoomGame()
@@ -200,6 +231,7 @@ game.set_available_game_variables([
     vzd.GameVariable.AMMO5, 
     vzd.GameVariable.KILLCOUNT,
     vzd.GameVariable.AMMO2,
+    vzd.GameVariable.PLAYER_NUMBER
 ])
 game.set_screen_format(vzd.ScreenFormat.GRAY8)  # 设置屏幕格式为灰度
 game.set_depth_buffer_enabled(True)  # 启用深度缓冲区
@@ -229,7 +261,7 @@ while True:
     # image2_list = []
     previous_kill_count = 0
     previous_health = 100
-    previous_ammo = game.get_game_variable(vzd.GameVariable.AMMO5)
+    previous_ammo = 50#game.get_game_variable(vzd.GameVariable.AMMO5)
     first_step = True
 
     state_getter=state_iter(game)
@@ -247,6 +279,8 @@ while True:
     
     while not game.is_episode_finished():
         game.send_game_command("give ammo")
+        #previous_ammo = game.get_game_variable(vzd.GameVariable.AMMO5)
+        #print(previous_ammo)
         
         step+=1
         
@@ -317,7 +351,7 @@ while True:
                     done
                     )
                 
-            if step%256==0:
+            if step%512==0:
                 agent.train()
                 step=0
             break
@@ -348,7 +382,7 @@ while True:
                 done
                 )
             
-        if step%256==0:
+        if step%512==0:
             agent.train()
             step=0
             break

@@ -105,7 +105,7 @@ class PPO:
         self.gamma=0.99
         self.lambd=0.95
         self.clip_para=0.2
-        self.epochs=15
+        self.epochs=20
         self.max_step=3000000
         self.total_step=0
         self.lr=5e-5
