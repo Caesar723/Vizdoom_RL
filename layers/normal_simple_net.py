@@ -28,78 +28,54 @@ class NormalNet(nn.Module):
         #     nn.LayerNorm(hidden_size)
         # )
         #self.label_norm = nn.LayerNorm(hidden_size)
+        self.conv1=self.generate_conv_layer(1)
+        self.conv2=self.generate_conv_layer(1)
+        self.conv3=self.generate_conv_layer(10)
+        self.conv4=self.generate_conv_layer(1)
+        self.conv5=self.generate_conv_layer(1)
 
-        self.conv3=nn.Sequential(
-            nn.Conv2d(in_channels=20, out_channels=32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-
-            # 第二个卷积块
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-
-            # 第三个卷积块
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2)
-        )
-
-        self.conv1=nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-
-            # 第二个卷积块
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-
-            # 第三个卷积块
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2)
-        )
-        self.conv2=nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-
-            # 第二个卷积块
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-
-            # 第三个卷积块
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2)
-        )
         
-        size=sum(i//8*i//8*128 for i in [image_size,image_size,image_size])
+        
+        size=sum(i//8*i//8*128 for i in [image_size,image_size,image_size,image_size,64])
         self.fc1 = nn.Sequential(
             nn.Linear(size, 1024),
-            nn.LayerNorm(1024),
+            # nn.LayerNorm(1024),
             nn.Tanh()
             
         )
         self.fc2 = nn.Sequential(
             nn.Linear(1024, 512),
-            nn.LayerNorm(512),
+            # nn.LayerNorm(512),
             nn.Tanh()
             
         )
         self.fc3 = nn.Sequential(
             nn.Linear(512, 256),
-            nn.LayerNorm(256),
+            # nn.LayerNorm(256),
             nn.Tanh()
         )
         self.fc4 = nn.Sequential(
             nn.Linear(256, 128),
-            nn.LayerNorm(128),
+            # nn.LayerNorm(128),
             nn.Tanh()
         )
-    def forward(self, images_seq1,images_seq2,images_seq3):
+    def generate_conv_layer(self,in_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels=in_channels, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+
+            # 第二个卷积块
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+
+            # 第三个卷积块
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)
+        )
+    def forward(self, images_seq1,images_seq2,images_seq3,images_seq4,images_seq5):
         
 
         images_seq1=self.conv1(images_seq1)
@@ -108,8 +84,12 @@ class NormalNet(nn.Module):
         images_seq2=images_seq2.flatten(start_dim=1)
         images_seq3=self.conv3(images_seq3)
         images_seq3=images_seq3.flatten(start_dim=1)
+        images_seq4=self.conv4(images_seq4)
+        images_seq4=images_seq4.flatten(start_dim=1)
+        images_seq5=self.conv5(images_seq5)
+        images_seq5=images_seq5.flatten(start_dim=1)
         
-        x=torch.cat([images_seq1,images_seq2,images_seq3],dim=-1)
+        x=torch.cat([images_seq1,images_seq2,images_seq3,images_seq4,images_seq5],dim=-1)
         x=self.fc1(x)
         x=self.fc2(x)
         x=self.fc3(x)

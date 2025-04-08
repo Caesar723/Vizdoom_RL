@@ -51,33 +51,25 @@ def get_state(game):
     class_buff=[
         "HealthBonus",
         "Medikit",
-        "GreenArmor",
-    ]
-
-    class_ammo=[
-        "Rocket"
     ]
 
     all_class=[
-        [class_opponent,[255, 0, 0,0],[]],
-        [class_buff,[0, 255, 0,0],[]],
-        [class_ammo,[0, 0, 255,0],[]],
-        [class_self,[0, 0, 0,255],[]],
+        [class_opponent,[255, 0, 0],[]],
+        [class_self,[0,  255, 0],[]],
+        [class_buff,[0, 0, 255],[]],
+        
     ]
 
    
     
-    normal_state=[
-        game.get_game_variable(vzd.GameVariable.HEALTH),
-        game.get_game_variable(vzd.GameVariable.AMMO2)
-    ]
+    
     
     depth_map = state.depth_buffer
     small_map = state.automap_buffer
 
     labels = state.labels_buffer
     #print(labels)
-    color_map = np.zeros((labels.shape[0], labels.shape[1],4), dtype=np.uint8)
+    color_map = np.zeros((labels.shape[0], labels.shape[1],3), dtype=np.uint8)
     for label in state.labels:
         for i in range(len(all_class)):
             if label.object_name in all_class[i][0]:
@@ -90,22 +82,29 @@ def get_state(game):
 
     color_map_process = cv2.resize(color_map_process, (128, 128))
     color_map_process=color_map_process.transpose(2,0,1)/255
+
+    medi_img=color_map_process[2]
+    color_map_process=color_map_process[:2]
     
     
 
     
     map=state.screen_buffer
+    life_img=map[-75:-25,100:210]
+    life_img=cv2.resize(life_img,(64,64))
+    life_img=life_img/255
+    
 
     normalized_depth = image_process(depth_map)/255
     # normalized_small_map = image_process(small_map)/255
-    # normalized_map = image_process(map)/255
+    normalized_map = image_process(map)/255
     #print(map.shape)
 
     #print(color_map[:-75, 250:-250,0].shape)
     cropped_map = cv2.resize(color_map[:-75, 250:-250,0], (128, 128))/255
    
     
-    return normalized_depth,cropped_map,color_map_process
+    return normalized_depth,cropped_map,color_map_process,life_img,medi_img
 
 
 def pad_labels(labels_cache):
@@ -125,7 +124,7 @@ def pad_labels(labels_cache):
 def state_iter(game):
     map_cache=[]
     for i in range(5):
-        normalized_depth,cropped_map,normalized_map= get_state(game)
+        normalized_depth,cropped_map,normalized_map,life_img,medi_img= get_state(game)
         map_cache.append(normalized_map)
         game.advance_action()
         #yield None
@@ -137,9 +136,10 @@ def state_iter(game):
         
         
         tensor_map=torch.cat([torch.from_numpy(m) for m in map_cache],dim=0)
+        #print(tensor_map.shape)
         #print(tensor_labels)
-        yield normalized_depth,cropped_map, tensor_map
-        normalized_depth,cropped_map,normalized_map = get_state(game)
+        yield normalized_depth,cropped_map,tensor_map,life_img,medi_img
+        normalized_depth,cropped_map,normalized_map,life_img,medi_img = get_state(game)
         map_cache.pop(0)
         map_cache.append(normalized_map)
         
@@ -155,7 +155,7 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     if current_ammo<previous_ammo:
         reward += (current_ammo - previous_ammo) * 100
     #if current_health>previous_health:
-    reward += (current_health - previous_health) * 1
+    reward += (current_health - previous_health) * 10
     
     previous_kill_count = current_kill_count
     previous_health = current_health
@@ -169,7 +169,7 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     #     reward=1000
     
     reward = reward/1000
-    print(reward)
+    #print(reward)
     return reward,done,current_kill_count,current_health,current_ammo
 # 初始化 DoomGame
 game = vzd.DoomGame()
@@ -220,7 +220,7 @@ while True:
     # while next_state is None:
     #     next_state=next(state_iter)
 
-    normalized_depth, cropped_map,normalized_map=next_state
+    normalized_depth, cropped_map,normalized_map,life_img,medi_img=next_state
     # print(normalized_depth.shape)
     # print(labels_pad.shape)
     # print(normal_state)
@@ -240,6 +240,8 @@ while True:
                 torch_image1_list = torch.tensor(normalized_depth, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
                 torch_image2_list = torch.tensor(cropped_map, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
                 torch_image3_list = torch.tensor(normalized_map, dtype=torch.float32).unsqueeze(0)
+                torch_image4_list = torch.tensor(life_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+                torch_image5_list = torch.tensor(medi_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
                 #print(labels_list.shape)
                 
                 
@@ -247,7 +249,7 @@ while True:
                 
         
         
-            action =agent.choose_act(torch_image1_list, torch_image2_list, torch_image3_list)
+            action =agent.choose_act(torch_image1_list, torch_image2_list, torch_image3_list,torch_image4_list,torch_image5_list)
             #action = 3
         action_list = np.zeros(num_actions)
         action_list[action] = 1
@@ -270,26 +272,27 @@ while True:
                     torch_image1_list.squeeze(0), 
                     torch_image2_list.squeeze(0), 
                     torch_image3_list.squeeze(0),
-                    
+                    torch_image4_list.squeeze(0),
+                    torch_image5_list.squeeze(0),
                     action,
                     reward,
                     
                     torch_image1_list.squeeze(0), 
                     torch_image2_list.squeeze(0), 
                     torch_image3_list.squeeze(0),
-                    
-                    
+                    torch_image4_list.squeeze(0),
+                    torch_image5_list.squeeze(0),
                     done
                     )
                 
-            if step%512==0:
+            if step%256==0:
                 agent.train()
                 step=0
             break
         
         
 
-        next_normalized_depth, next_labels,next_normal_state=next(state_getter)
+        next_normalized_depth, next_labels,next_normal_state,next_life_img,next_medi_img=next(state_getter)
         
         
         
@@ -297,30 +300,37 @@ while True:
             next_torch_image1_list = torch.tensor(next_normalized_depth, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
             next_torch_image2_list = torch.tensor(next_labels, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
             next_torch_image3_list = torch.tensor(next_normal_state, dtype=torch.float32).unsqueeze(0)
+            next_torch_image4_list = torch.tensor(next_life_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+            next_torch_image5_list = torch.tensor(next_medi_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
             
             
             agent.store(
                 torch_image1_list.squeeze(0), 
                 torch_image2_list.squeeze(0), 
                 torch_image3_list.squeeze(0),
-                
+                torch_image4_list.squeeze(0),
+                torch_image5_list.squeeze(0),
                 action,
                 reward,
                 next_torch_image1_list.squeeze(0),
                 next_torch_image2_list.squeeze(0),
                 next_torch_image3_list.squeeze(0),
-                
+                next_torch_image4_list.squeeze(0),
+                next_torch_image5_list.squeeze(0),
                 done
                 )
             
-        if step%512==0:
+        if step%256==0:
             agent.train()
             step=0
             break
             
+        
+        life_img=next_life_img
+        medi_img=next_medi_img
+        normalized_map=next_normal_state
+        cropped_map=next_labels
         normalized_depth=next_normalized_depth
-        labels=next_labels
-        normal_state=next_normal_state
         
         
         
