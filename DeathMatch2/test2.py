@@ -9,7 +9,7 @@ import cv2
 import torch
 import os
 from torch.nn.utils.rnn import pad_sequence
-import DeathMatch.ppo2 as ppo2
+import DeathMatch2.ppo2 as ppo2
 
 
 def image_process(image):
@@ -31,23 +31,7 @@ def pad_or_truncate(tensor, fixed_len):
 
 def get_state(game):
     state = game.get_state()
-
-    keeped_ids={
-        # "DoomPlayer":0,
-        "Rocket":1,
-        "ShotgunGuy":2,
-        "MarineChainsawVzd":3,
-        "Zombieman":4,
-        "ChaingunGuy":5,
-        "Demon":6,
-        "HellKnight":7,
-        "Medikit":8,
-        "Stimpack":9,
-        "HealthBonus":10,
-        "GreenArmor":11,
-        "BlueArmor":12,
-        "ArmorBonus":13
-    }
+    
     class_opponent=[
         # "DoomPlayer",
         "ShotgunGuy",
@@ -56,100 +40,72 @@ def get_state(game):
         "ChaingunGuy",
         "Demon",
         "HellKnight",
-        # "Medikit",
-        # "Stimpack"
+        
+        
     ]
+
+    class_self=[
+        "DoomPlayer",
+    ]
+
     class_buff=[
         "HealthBonus",
+        "Medikit",
         "GreenArmor",
-        "BlueArmor",
-        "ArmorBonus"
     ]
+
     class_ammo=[
         "Rocket"
     ]
+
     all_class=[
-        (class_opponent,[],10),
-        #(class_buff,[],5),
-        (class_ammo,[],1)
+        [class_opponent,[255, 0, 0,0],[]],
+        [class_buff,[0, 255, 0,0],[]],
+        [class_ammo,[0, 0, 255,0],[]],
+        [class_self,[0, 0, 0,255],[]],
     ]
-    # player_number=game.get_game_variable(vzd.GameVariable.PLAYER_NUMBER)
-    # print(player_number)
-    #labels=[[   0,  -82,   62,  163,  100]]
-    
-    for i in state.labels:
-        if i.object_name not in keeped_ids:
-            continue
-        
-        element=[
-            
-            i.x+i.width//2- state.screen_buffer.shape[1] // 2,
-            i.y+i.height//2- state.screen_buffer.shape[0] // 2,
-            i.width,
-            i.height
-        ]
-        for class_tuple in all_class:
-            if i.object_name in class_tuple[0]:
-                if len(class_tuple[1])<class_tuple[2]:
-                    class_tuple[1].append(element)
-                    # class_tuple[1].append(element[1])
-                    # class_tuple[1].append(element[2])
-                    # class_tuple[1].append(element[3])
-                break
-        
-    for class_tuple in all_class:
-        while len(class_tuple[1])<class_tuple[2]:
-            class_tuple[1].append([0,0,0,0])
-            # class_tuple[1].append(0)
-            # class_tuple[1].append(0)
-            # class_tuple[1].append(0)
-        #labels.append(element)
-    
-    #print(all_class)
-        
-    
-    
-    depth_map = state.depth_buffer
-    # for label in state.labels:
-    #     if label.object_name in class_opponent :
-    #         if label.object_name=="DoomPlayer":
-    #             print(label.object_id)
-    #         if label.object_id==player_number and label.object_name=="DoomPlayer":
-    #             continue
-    #         cv2.rectangle(depth_map, (label.x, label.y), (label.x + label.width, label.y + label.height), (155, 0, 0), 2)
-    #     if label.object_name in class_buff:
-    #         cv2.rectangle(depth_map, (label.x, label.y), (label.x + label.width, label.y + label.height), (255, 0, 0), 2)
-    #     if label.object_name in class_ammo:
-    #         cv2.rectangle(depth_map, (label.x, label.y), (label.x + label.width, label.y + label.height), (55, 0, 0), 2)
-        
-    # cv2.imshow("depth_map",depth_map)
-    # cv2.waitKey(0)
-    # small_map = state.automap_buffer
-    # map=state.screen_buffer
 
-    normalized_depth = image_process(depth_map)/255
-    # normalized_map = image_process(map)/255
-    # #print(map.shape)
-    # cropped_map = cv2.resize(map[:-75, 250:-250], (128, 128))/255
-
+   
+    
     normal_state=[
         game.get_game_variable(vzd.GameVariable.HEALTH),
         game.get_game_variable(vzd.GameVariable.AMMO2)
     ]
+    
+    depth_map = state.depth_buffer
+    small_map = state.automap_buffer
 
-    labels=[]
-    sort_labels=lambda x:x[2]+x[3]
-    for class_tuple in all_class:
-        
-        class_tuple[1].sort(key=sort_labels,reverse=True)
-        
-        for x in class_tuple[1]:
-            labels+=x[:2]
-    
-    labels=torch.FloatTensor(np.array(labels)/100)
+    labels = state.labels_buffer
     #print(labels)
+    color_map = np.zeros((labels.shape[0], labels.shape[1],4), dtype=np.uint8)
+    for label in state.labels:
+        for i in range(len(all_class)):
+            if label.object_name in all_class[i][0]:
+                all_class[i][2].append(label.value)
+                break
+    for i in range(len(all_class)):
+        color_map[np.isin(labels,all_class[i][2])]=all_class[i][1]
+    #
+    color_map_process = color_map[:-75,:, :]
+
+    color_map_process = cv2.resize(color_map_process, (128, 128))
+    color_map_process=color_map_process.transpose(2,0,1)/255
     
-    return normalized_depth,labels,normal_state
+    
+
+    
+    map=state.screen_buffer
+
+    normalized_depth = image_process(depth_map)/255
+    # normalized_small_map = image_process(small_map)/255
+    # normalized_map = image_process(map)/255
+    #print(map.shape)
+
+    #print(color_map[:-75, 250:-250,0].shape)
+    cropped_map = cv2.resize(color_map[:-75, 250:-250,0], (128, 128))/255
+   
+    
+    return normalized_depth,cropped_map,color_map_process
 
 
 def pad_labels(labels_cache):
@@ -167,11 +123,11 @@ def pad_labels(labels_cache):
 
 
 def state_iter(game):
-    labels_cache=[]
-    for i in range(15):
-        normalized_depth, labels,normal_state = get_state(game)
-        labels_cache.append(labels)
-        #game.advance_action()
+    map_cache=[]
+    for i in range(5):
+        normalized_depth,cropped_map,normalized_map= get_state(game)
+        map_cache.append(normalized_map)
+        game.advance_action()
         #yield None
     
     #labels_pad,mask=pad_labels(labels_cache)
@@ -180,18 +136,12 @@ def state_iter(game):
     while True:
         
         
-        #labels_pad=pad_or_truncate(labels, 25)
-        
-        #mask = torch.arange(labels_pad.shape[0])[None, :] < min(labels.size(0),25)
-        # print(mask.shape)
-        # print(labels_pad.shape)
-        # print(mask)
-        tensor_labels=torch.stack(labels_cache)
+        tensor_map=torch.cat([torch.from_numpy(m) for m in map_cache],dim=0)
         #print(tensor_labels)
-        yield normalized_depth, tensor_labels,normal_state
-        normalized_depth, labels,normal_state = get_state(game)
-        labels_cache.pop(0)
-        labels_cache.append(labels)
+        yield normalized_depth,cropped_map, tensor_map
+        normalized_depth,cropped_map,normalized_map = get_state(game)
+        map_cache.pop(0)
+        map_cache.append(normalized_map)
         
         #labels_pad,mask=pad_labels(labels_cache)
 
@@ -240,12 +190,12 @@ game.set_labels_buffer_enabled(True)
 game.set_automap_buffer_enabled(True)
 
 game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
-#game.set_window_visible(False)
+game.set_window_visible(False)
 game.init()
 
 
 num_actions=9
-agent = ppo2.PPO(input_size=128,label_size=22,output_dim=num_actions)
+agent = ppo2.PPO(input_size=128,output_dim=num_actions)
 
 frame_repeat=10
 step=1
@@ -270,7 +220,7 @@ while True:
     # while next_state is None:
     #     next_state=next(state_iter)
 
-    normalized_depth, labels,normal_state=next_state
+    normalized_depth, cropped_map,normalized_map=next_state
     # print(normalized_depth.shape)
     # print(labels_pad.shape)
     # print(normal_state)
@@ -288,8 +238,8 @@ while True:
         with torch.no_grad():
             if first_step:
                 torch_image1_list = torch.tensor(normalized_depth, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-                normal_state_list = torch.tensor(normal_state, dtype=torch.float32).unsqueeze(0)
-                labels_list = labels.unsqueeze(0)
+                torch_image2_list = torch.tensor(cropped_map, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+                torch_image3_list = torch.tensor(normalized_map, dtype=torch.float32).unsqueeze(0)
                 #print(labels_list.shape)
                 
                 
@@ -297,7 +247,7 @@ while True:
                 
         
         
-            action =agent.choose_act(torch_image1_list, labels_list, normal_state_list)
+            action =agent.choose_act(torch_image1_list, torch_image2_list, torch_image3_list)
             #action = 3
         action_list = np.zeros(num_actions)
         action_list[action] = 1
@@ -318,15 +268,15 @@ while True:
                 agent.store(
                     
                     torch_image1_list.squeeze(0), 
-                    labels.squeeze(0), 
-                    normal_state_list.squeeze(0),
+                    torch_image2_list.squeeze(0), 
+                    torch_image3_list.squeeze(0),
                     
                     action,
                     reward,
                     
                     torch_image1_list.squeeze(0), 
-                    labels.squeeze(0), 
-                    normal_state_list.squeeze(0),
+                    torch_image2_list.squeeze(0), 
+                    torch_image3_list.squeeze(0),
                     
                     
                     done
@@ -345,20 +295,20 @@ while True:
         
         with torch.no_grad():
             next_torch_image1_list = torch.tensor(next_normalized_depth, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-            next_normal_state_list = torch.tensor(next_normal_state, dtype=torch.float32).unsqueeze(0)
-            next_labels_list = next_labels.unsqueeze(0)
+            next_torch_image2_list = torch.tensor(next_labels, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+            next_torch_image3_list = torch.tensor(next_normal_state, dtype=torch.float32).unsqueeze(0)
             
             
             agent.store(
                 torch_image1_list.squeeze(0), 
-                labels_list.squeeze(0), 
-                normal_state_list.squeeze(0),
+                torch_image2_list.squeeze(0), 
+                torch_image3_list.squeeze(0),
                 
                 action,
                 reward,
                 next_torch_image1_list.squeeze(0),
-                next_labels_list.squeeze(0),
-                next_normal_state_list.squeeze(0),
+                next_torch_image2_list.squeeze(0),
+                next_torch_image3_list.squeeze(0),
                 
                 done
                 )
