@@ -218,12 +218,15 @@ class PPO:
         self.images_seq1=[]
         self.images_seq2=[]
         self.images_seq3=[]
-        
+        self.images_seq4=[]
+        self.images_seq5=[]
         self.action=[]
         self.reward=[]
         self.next_images_seq1=[]
         self.next_images_seq2=[]
         self.next_images_seq3=[]
+        self.next_images_seq4=[]
+        self.next_images_seq5=[]
         self.done=[]
         self.reward_scale.reset()
         
