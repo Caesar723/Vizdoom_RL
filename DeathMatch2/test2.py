@@ -44,9 +44,9 @@ def get_state(game):
         
     ]
 
-    class_self=[
-        "DoomPlayer",
-    ]
+    # class_self=[
+    #     "DoomPlayer",
+    # ]
 
     class_buff=[
         "HealthBonus",
@@ -57,10 +57,10 @@ def get_state(game):
     ]
 
     all_class=[
-        [class_opponent,np.array([255, 0, 0,0]),[]],
-        [class_self,np.array([0,  255, 0,0]),[]],
-        [class_buff,np.array([0, 0, 255,0]),[]],
-        [class_rocket,np.array([0, 0, 0,255]),[]],
+        [class_opponent,np.array([255, 0, 0]),[]],
+        # [class_self,np.array([0,  255, 0,0]),[]],
+        [class_buff,np.array([0, 255,0]),[]],
+        [class_rocket,np.array([0, 0,255]),[]],
     ]
 
    
@@ -72,7 +72,7 @@ def get_state(game):
 
     labels = state.labels_buffer
     #print(labels)
-    color_map = np.zeros((labels.shape[0], labels.shape[1],4), dtype=np.uint8)
+    color_map = np.zeros((labels.shape[0], labels.shape[1],3), dtype=np.uint8)
     for label in state.labels:
         for i in range(len(all_class)):
             if label.object_name in all_class[i][0]:
@@ -110,7 +110,7 @@ def get_state(game):
     cropped_map = np.expand_dims(cropped_map, axis=0)
 
    
-    img_stat=np.concatenate([normalized_depth,color_map_process,cropped_map,],axis=0)
+    img_stat=np.concatenate([normalized_depth,color_map_process,],axis=0)
     #print(img_stat.shape)
     return img_stat,life_img
 

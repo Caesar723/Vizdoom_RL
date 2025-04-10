@@ -30,7 +30,7 @@ class NormalNet(nn.Module):
         # )
         #self.label_norm = nn.LayerNorm(hidden_size)
         self.conv1=self.generate_conv2d_layer(1)
-        self.conv2=self.generate_conv2d_layer(6)
+        self.conv2=self.generate_conv2d_layer(4)
 
 
         self.gru=GRU(image_size//8*image_size//8*128,hidden_size)
