@@ -52,12 +52,15 @@ def get_state(game):
         "HealthBonus",
         "Medikit",
     ]
+    class_rocket=[
+        "Rocket"
+    ]
 
     all_class=[
-        [class_opponent,[255, 0, 0],[]],
-        [class_self,[0,  255, 0],[]],
-        [class_buff,[0, 0, 255],[]],
-        
+        [class_opponent,[255, 0, 0,0],[]],
+        [class_self,[0,  255, 0,0],[]],
+        [class_buff,[0, 0, 255,0],[]],
+        [class_rocket,[0, 0, 0,255],[]],
     ]
 
    
@@ -69,7 +72,7 @@ def get_state(game):
 
     labels = state.labels_buffer
     #print(labels)
-    color_map = np.zeros((labels.shape[0], labels.shape[1],3), dtype=np.uint8)
+    color_map = np.zeros((labels.shape[0], labels.shape[1],4), dtype=np.uint8)
     for label in state.labels:
         for i in range(len(all_class)):
             if label.object_name in all_class[i][0]:
@@ -83,28 +86,33 @@ def get_state(game):
     color_map_process = cv2.resize(color_map_process, (128, 128))
     color_map_process=color_map_process.transpose(2,0,1)/255
 
-    medi_img=color_map_process[2]
-    color_map_process=color_map_process[:2]
+    # medi_img=color_map_process[2]
+    # color_map_process=color_map_process[:2]
     
     
 
     
     map=state.screen_buffer
     life_img=map[-75:-25,100:210]
-    life_img=cv2.resize(life_img,(64,64))
+    life_img=cv2.resize(life_img,(128,128))
     life_img=life_img/255
     
 
     normalized_depth = image_process(depth_map)/255
+    normalized_depth = np.expand_dims(normalized_depth, axis=0)
     # normalized_small_map = image_process(small_map)/255
-    normalized_map = image_process(map)/255
+    #normalized_map = image_process(map)/255
+    #normalized_map = np.expand_dims(normalized_map, axis=0)
     #print(map.shape)
 
     #print(color_map[:-75, 250:-250,0].shape)
     cropped_map = cv2.resize(color_map[:-75, 250:-250,0], (128, 128))/255
+    cropped_map = np.expand_dims(cropped_map, axis=0)
+
    
-    
-    return normalized_depth,cropped_map,color_map_process,life_img,medi_img
+    img_stat=np.concatenate([normalized_depth,color_map_process,cropped_map,],axis=0)
+    #print(img_stat.shape)
+    return img_stat,life_img
 
 
 def pad_labels(labels_cache):
@@ -123,9 +131,9 @@ def pad_labels(labels_cache):
 
 def state_iter(game):
     map_cache=[]
-    for i in range(5):
-        normalized_depth,cropped_map,normalized_map,life_img,medi_img= get_state(game)
-        map_cache.append(normalized_map)
+    for i in range(8):
+        state_img,life_img= get_state(game)
+        map_cache.append(state_img)
         game.advance_action()
         #yield None
     
@@ -135,13 +143,13 @@ def state_iter(game):
     while True:
         
         
-        tensor_map=torch.cat([torch.from_numpy(m) for m in map_cache],dim=0)
+        tensor_map=torch.FloatTensor(np.array(map_cache)).detach()
         #print(tensor_map.shape)
         #print(tensor_labels)
-        yield normalized_depth,cropped_map,tensor_map,life_img,medi_img
-        normalized_depth,cropped_map,normalized_map,life_img,medi_img = get_state(game)
+        yield tensor_map,life_img
+        state_img,life_img = get_state(game)
         map_cache.pop(0)
-        map_cache.append(normalized_map)
+        map_cache.append(state_img)
         
         #labels_pad,mask=pad_labels(labels_cache)
 
@@ -206,10 +214,7 @@ while True:
     game.send_game_command("use rocketlauncher")
     game.send_game_command("give allammo")
     game.add_game_args("+sv_nopickup 1")
-    # state_list = []
-    # obj_ids_list = []
-    # image1_list = []
-    # image2_list = []
+    
     previous_kill_count = 0
     previous_health = 100
     previous_ammo = 50#game.get_game_variable(vzd.GameVariable.AMMO5)
@@ -217,39 +222,22 @@ while True:
 
     state_getter=state_iter(game)
     next_state=next(state_getter)
-    # while next_state is None:
-    #     next_state=next(state_iter)
+    
 
-    normalized_depth, cropped_map,normalized_map,life_img,medi_img=next_state
-    # print(normalized_depth.shape)
-    # print(labels_pad.shape)
-    # print(normal_state)
-    # print(mask.shape)
-    # exit()
+    state_img,life_img=next_state
    
     
     while not game.is_episode_finished():
         game.send_game_command("give ammo")
-        #previous_ammo = game.get_game_variable(vzd.GameVariable.AMMO5)
-        #print(previous_ammo)
         
         step+=1
         
         with torch.no_grad():
             if first_step:
-                torch_image1_list = torch.tensor(normalized_depth, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-                torch_image2_list = torch.tensor(cropped_map, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-                torch_image3_list = torch.tensor(normalized_map, dtype=torch.float32).unsqueeze(0)
-                torch_image4_list = torch.tensor(life_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-                torch_image5_list = torch.tensor(medi_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-                #print(labels_list.shape)
+                torch_image1_list = torch.tensor(life_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+                torch_image2_list = torch.tensor(state_img, dtype=torch.float32).unsqueeze(0)
                 
-                
-                
-                
-        
-        
-            action =agent.choose_act(torch_image1_list, torch_image2_list, torch_image3_list,torch_image4_list,torch_image5_list)
+            action =agent.choose_act(torch_image1_list, torch_image2_list)
             #action = 3
         action_list = np.zeros(num_actions)
         action_list[action] = 1
@@ -262,26 +250,20 @@ while True:
         previous_kill_count = current_kill_count
         previous_health = current_health
         previous_ammo = current_ammo
-        # print(reward)
-        # print(reward_path)
-        # print()
+        
         if done:
             with torch.no_grad():
                 agent.store(
                     
                     torch_image1_list.squeeze(0), 
                     torch_image2_list.squeeze(0), 
-                    torch_image3_list.squeeze(0),
-                    torch_image4_list.squeeze(0),
-                    torch_image5_list.squeeze(0),
+                   
                     action,
                     reward,
                     
                     torch_image1_list.squeeze(0), 
                     torch_image2_list.squeeze(0), 
-                    torch_image3_list.squeeze(0),
-                    torch_image4_list.squeeze(0),
-                    torch_image5_list.squeeze(0),
+                    
                     done
                     )
                 
@@ -292,31 +274,24 @@ while True:
         
         
 
-        next_normalized_depth, next_labels,next_normal_state,next_life_img,next_medi_img=next(state_getter)
+        next_state_img,next_life_img=next(state_getter)
         
         
         
         with torch.no_grad():
-            next_torch_image1_list = torch.tensor(next_normalized_depth, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-            next_torch_image2_list = torch.tensor(next_labels, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-            next_torch_image3_list = torch.tensor(next_normal_state, dtype=torch.float32).unsqueeze(0)
-            next_torch_image4_list = torch.tensor(next_life_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-            next_torch_image5_list = torch.tensor(next_medi_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+            next_torch_image1_list = torch.tensor(next_life_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+            next_torch_image2_list = torch.tensor(next_state_img, dtype=torch.float32).unsqueeze(0)
             
             
             agent.store(
                 torch_image1_list.squeeze(0), 
                 torch_image2_list.squeeze(0), 
-                torch_image3_list.squeeze(0),
-                torch_image4_list.squeeze(0),
-                torch_image5_list.squeeze(0),
+                
                 action,
                 reward,
                 next_torch_image1_list.squeeze(0),
                 next_torch_image2_list.squeeze(0),
-                next_torch_image3_list.squeeze(0),
-                next_torch_image4_list.squeeze(0),
-                next_torch_image5_list.squeeze(0),
+                
                 done
                 )
             
@@ -327,10 +302,7 @@ while True:
             
         
         life_img=next_life_img
-        medi_img=next_medi_img
-        normalized_map=next_normal_state
-        cropped_map=next_labels
-        normalized_depth=next_normalized_depth
+        state_img=next_state_img
         
         
         

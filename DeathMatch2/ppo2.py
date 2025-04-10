@@ -30,12 +30,12 @@ class ActorCritic(nn.Module):
         orthogonal_init(self.critic)
         orthogonal_init(self.actor,gain=0.01)
 
-    def forward(self, images_seq1, images_seq2, images_seq3,images_seq4,images_seq5):
+    def forward(self, images_seq1, images_seq2):
         # print("images_seq1.shape:",images_seq1.shape,images_seq1)
         # print("images_seq2.shape:",images_seq2.shape,images_seq2)
         # print("state_seq.shape:",state_seq.shape,state_seq)
         # print("obj_ids.shape:",obj_ids.shape,obj_ids)
-        x = self.net(images_seq1, images_seq2, images_seq3,images_seq4,images_seq5)
+        x = self.net(images_seq1, images_seq2)
         value = self.critic(x)
         # print("x",  x)
         # print("value",value)
@@ -112,7 +112,7 @@ class PPO:
         self.epochs=15
         self.max_step=3000000
         self.total_step=0
-        self.lr=1e-5
+        self.lr=2e-5
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")
         elif torch.cuda.is_available():
@@ -136,9 +136,9 @@ class PPO:
         
         self.images_seq1 = []
         self.images_seq2 = []
-        self.images_seq3 = []
-        self.images_seq4 = []
-        self.images_seq5 = []
+        #self.images_seq3 = []
+        #self.images_seq4 = []
+        #self.images_seq5 = []
         
         self.action = []
         self.reward = []
@@ -146,9 +146,9 @@ class PPO:
         self.done = []
         self.next_images_seq1 = []
         self.next_images_seq2 = []
-        self.next_images_seq3 = []
-        self.next_images_seq4 = []
-        self.next_images_seq5 = []
+        #self.next_images_seq3 = []
+        #self.next_images_seq4 = []
+        #self.next_images_seq5 = []
         self.init_graph()
 
     def init_graph(self):
@@ -169,14 +169,14 @@ class PPO:
     def normalize_adv(self,adv:torch.Tensor):
         return ((adv - adv.mean()) / (adv.std() + 1e-5))
     
-    def choose_act(self,images_seq1,images_seq2,images_seq3,images_seq4,images_seq5):
+    def choose_act(self,images_seq1,images_seq2):
         images_seq1 = images_seq1.to(self.device)
         images_seq2 = images_seq2.to(self.device)
-        images_seq3 = images_seq3.to(self.device)
-        images_seq4 = images_seq4.to(self.device)
-        images_seq5 = images_seq5.to(self.device)
+        #images_seq3 = images_seq3.to(self.device)
+        #images_seq4 = images_seq4.to(self.device)
+        #images_seq5 = images_seq5.to(self.device)
         with torch.no_grad():
-            value, action_prob, dist, entropy = self.model(images_seq1,images_seq2,images_seq3,images_seq4,images_seq5)
+            value, action_prob, dist, entropy = self.model(images_seq1,images_seq2)
             action = dist.sample()
             #action_log_prob = dist.log_prob(action)
         
@@ -185,48 +185,48 @@ class PPO:
     def store(self,
               images_seq1,
               images_seq2,
-              images_seq3,
-              images_seq4,
-              images_seq5,
+              #images_seq3,
+              #images_seq4,
+              #images_seq5,
               action,
               reward,
               next_images_seq1,
               next_images_seq2,
-              next_images_seq3,
-              next_images_seq4,
-              next_images_seq5,
+              #next_images_seq3,
+              #next_images_seq4,
+              #next_images_seq5,
               done):
         self.graph_on_step(reward)
         
         self.images_seq1.append(images_seq1)
         self.images_seq2.append(images_seq2)
-        self.images_seq3.append(images_seq3)
-        self.images_seq4.append(images_seq4)
-        self.images_seq5.append(images_seq5)
+        #self.images_seq3.append(images_seq3)
+        #self.images_seq4.append(images_seq4)
+        #self.images_seq5.append(images_seq5)
         self.action.append(action)
         #reward=self.reward_scale(reward)
         self.reward.append(reward)
         self.done.append(done)
         self.next_images_seq1.append(next_images_seq1)
         self.next_images_seq2.append(next_images_seq2)
-        self.next_images_seq3.append(next_images_seq3)
-        self.next_images_seq4.append(next_images_seq4)
-        self.next_images_seq5.append(next_images_seq5)
+        #self.next_images_seq3.append(next_images_seq3)
+        #self.next_images_seq4.append(next_images_seq4)
+        #self.next_images_seq5.append(next_images_seq5)
 
     
     def clean(self):
         self.images_seq1=[]
         self.images_seq2=[]
-        self.images_seq3=[]
-        self.images_seq4=[]
-        self.images_seq5=[]
+        #self.images_seq3=[]
+        #self.images_seq4=[]
+        #self.images_seq5=[]
         self.action=[]
         self.reward=[]
         self.next_images_seq1=[]
         self.next_images_seq2=[]
-        self.next_images_seq3=[]
-        self.next_images_seq4=[]
-        self.next_images_seq5=[]
+        #self.next_images_seq3=[]
+        #self.next_images_seq4=[]
+        #self.next_images_seq5=[]
         self.done=[]
         self.reward_scale.reset()
         
@@ -256,22 +256,22 @@ class PPO:
         self.graph_on_rollout_end()
         images_seq1=torch.FloatTensor(np.array(self.images_seq1)).to(self.device).detach()
         images_seq2=torch.FloatTensor(np.array(self.images_seq2)).to(self.device).detach()
-        images_seq3=torch.FloatTensor(np.array(self.images_seq3)).to(self.device).detach()
-        images_seq4=torch.FloatTensor(np.array(self.images_seq4)).to(self.device).detach()
-        images_seq5=torch.FloatTensor(np.array(self.images_seq5)).to(self.device).detach()
+        #images_seq3=torch.FloatTensor(np.array(self.images_seq3)).to(self.device).detach()
+        #images_seq4=torch.FloatTensor(np.array(self.images_seq4)).to(self.device).detach()
+        #images_seq5=torch.FloatTensor(np.array(self.images_seq5)).to(self.device).detach()
         action=torch.LongTensor(np.array(self.action)).unsqueeze(1).to(self.device).detach()
         done=torch.FloatTensor(np.array(self.done)).unsqueeze(1).to(self.device).detach()
         next_images_seq1=torch.FloatTensor(np.array(self.next_images_seq1)).to(self.device).detach()
         next_images_seq2=torch.FloatTensor(np.array(self.next_images_seq2)).to(self.device).detach()
-        next_images_seq3=torch.FloatTensor(np.array(self.next_images_seq3)).to(self.device).detach()
-        next_images_seq4=torch.FloatTensor(np.array(self.next_images_seq4)).to(self.device).detach()
-        next_images_seq5=torch.FloatTensor(np.array(self.next_images_seq5)).to(self.device).detach()
+        #next_images_seq3=torch.FloatTensor(np.array(self.next_images_seq3)).to(self.device).detach()
+        #next_images_seq4=torch.FloatTensor(np.array(self.next_images_seq4)).to(self.device).detach()
+        #next_images_seq5=torch.FloatTensor(np.array(self.next_images_seq5)).to(self.device).detach()
         reward=torch.FloatTensor(np.array(self.reward)).unsqueeze(1).to(self.device).detach()
 
        
         with torch.no_grad():
-            v, _, dist,_ = self.model(images_seq1,images_seq2,images_seq3,images_seq4,images_seq5)
-            v_, _, _, _ = self.model(next_images_seq1,next_images_seq2,next_images_seq3,next_images_seq4,next_images_seq5)
+            v, _, dist,_ = self.model(images_seq1,images_seq2)
+            v_, _, _, _ = self.model(next_images_seq1,next_images_seq2)
             delta=reward+self.gamma*v_*(1-done)-v
             advantage=self.advantage_cal(delta,done)
             advantage=torch.FloatTensor(advantage).detach().to(self.device)
@@ -291,10 +291,10 @@ class PPO:
             for i in range(0,data_size,batch_size):
                 images_seq1_batch=images_seq1[i:i+batch_size]
                 images_seq2_batch=images_seq2[i:i+batch_size]
-                images_seq3_batch=images_seq3[i:i+batch_size]
+                #images_seq3_batch=images_seq3[i:i+batch_size]
                 action_batch=action[i:i+batch_size]
-                images_seq4_batch=images_seq4[i:i+batch_size]
-                images_seq5_batch=images_seq5[i:i+batch_size]
+                #images_seq4_batch=images_seq4[i:i+batch_size]
+                #images_seq5_batch=images_seq5[i:i+batch_size]
                 advantage_batch=advantage[i:i+batch_size]
                 action_log_prob_batch=action_log_prob[i:i+batch_size]
                 rewards_batch=rewards[i:i+batch_size]
@@ -302,7 +302,7 @@ class PPO:
 
 
                 
-                v, _, dist,entropy = self.model(images_seq1_batch,images_seq2_batch,images_seq3_batch,images_seq4_batch,images_seq5_batch)
+                v, _, dist,entropy = self.model(images_seq1_batch,images_seq2_batch)
                 new_prob_log=dist.log_prob(action_batch.squeeze(-1))
                 
                 rate=torch.exp(new_prob_log-action_log_prob_batch.detach()).unsqueeze(1)

@@ -7,10 +7,11 @@ if __name__ == "__main__":
 
 from layers.setTransfer import SetTransformer
 from layers.lstm import GRU
-
+import os
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 class NormalNet(nn.Module):
-    def __init__(self,hidden_size=128,image_size=128):
+    def __init__(self,hidden_size=128,image_size=84):
         super().__init__()
         self.hidden_size=hidden_size
 
@@ -28,71 +29,107 @@ class NormalNet(nn.Module):
         #     nn.LayerNorm(hidden_size)
         # )
         #self.label_norm = nn.LayerNorm(hidden_size)
-        self.conv1=self.generate_conv_layer(1)
-        self.conv2=self.generate_conv_layer(1)
-        self.conv3=self.generate_conv_layer(10)
-        self.conv4=self.generate_conv_layer(1)
-        self.conv5=self.generate_conv_layer(1)
+        self.conv1=self.generate_conv2d_layer(1)
+        self.conv2=self.generate_conv2d_layer(6)
+
+
+        self.gru=GRU(image_size//8*image_size//8*128,hidden_size)
+        # self.conv3=self.generate_conv_layer(10)
+        # self.conv4=self.generate_conv_layer(1)
+        # self.conv5=self.generate_conv_layer(1)
 
         
         
-        size=sum(i//8*i//8*128 for i in [image_size,image_size,image_size,image_size,64])
+        size=sum(i//8*i//8*128 for i in [image_size])
+        
         self.fc1 = nn.Sequential(
-            nn.Linear(size, 1024),
-            # nn.LayerNorm(1024),
-            nn.Tanh()
+            nn.Linear(size, 128),
+            nn.LayerNorm(128),
+            nn.Tanh(),
+            nn.Dropout(p=0.3)
             
         )
-        self.fc2 = nn.Sequential(
-            nn.Linear(1024, 512),
-            # nn.LayerNorm(512),
-            nn.Tanh()
+        # self.fc2 = nn.Sequential(
+        #     nn.Linear(512, 256),
+        #     nn.LayerNorm(256),
+        #     nn.Tanh(),
+        #     nn.Dropout(p=0.3)
             
-        )
-        self.fc3 = nn.Sequential(
-            nn.Linear(512, 256),
-            # nn.LayerNorm(256),
-            nn.Tanh()
-        )
+        # )
+        # self.fc3 = nn.Sequential(
+        #     nn.Linear(512, 256),
+        #     # nn.LayerNorm(256),
+        #     nn.Tanh(),
+        #     nn.Dropout(p=0.3)
+        # )
         self.fc4 = nn.Sequential(
-            nn.Linear(256, 128),
-            # nn.LayerNorm(128),
-            nn.Tanh()
+            nn.Linear(128+128, 128),
+            nn.LayerNorm(128),
+            nn.Tanh(),
         )
-    def generate_conv_layer(self,in_channels):
+    def generate_conv2d_layer(self,in_channels):
         return nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=32, kernel_size=3, padding=1),
             nn.ReLU(),
+            nn.Dropout2d(p=0.3),
             nn.MaxPool2d(kernel_size=2),
 
             # 第二个卷积块
             nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
             nn.ReLU(),
+            nn.Dropout2d(p=0.3),
             nn.MaxPool2d(kernel_size=2),
 
             # 第三个卷积块
             nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
             nn.ReLU(),
+            nn.Dropout2d(p=0.3),
             nn.MaxPool2d(kernel_size=2)
         )
-    def forward(self, images_seq1,images_seq2,images_seq3,images_seq4,images_seq5):
-        
+    def generate_conv3d_layer(self,in_channels):
+        return nn.Sequential(
+            nn.Conv3d(in_channels=in_channels, out_channels=32, kernel_size=3, padding=1, stride=2),
+            nn.ReLU(),
+            nn.Dropout3d(p=0.3),
+            #nn.AvgPool3d(kernel_size=2),
 
+            # 第二个卷积块
+            nn.Conv3d(in_channels=32, out_channels=64, kernel_size=3, padding=1, stride=2),
+            nn.ReLU(),
+            nn.Dropout3d(p=0.3),
+            #nn.AvgPool3d(kernel_size=2),
+
+            # 第三个卷积块
+            nn.Conv3d(in_channels=64, out_channels=128, kernel_size=3, padding=1, stride=2),
+            nn.ReLU(),
+            nn.Dropout3d(p=0.3),
+            #nn.AvgPool3d(kernel_size=2)
+        )
+    def forward(self, images_seq1,images_seq2):
+        
+        #print(images_seq1.shape)
         images_seq1=self.conv1(images_seq1)
         images_seq1=images_seq1.flatten(start_dim=1)
+
+        #print(images_seq2.shape)
+        #images_seq2=images_seq2.permute(0, 2, 1, 3, 4)  
+        #print(images_seq2.shape)
+        B,T,C,H,W=images_seq2.shape
+        images_seq2=images_seq2.view(B * T, C, H, W)
+        #print(images_seq2.shape)
         images_seq2=self.conv2(images_seq2)
-        images_seq2=images_seq2.flatten(start_dim=1)
-        images_seq3=self.conv3(images_seq3)
-        images_seq3=images_seq3.flatten(start_dim=1)
-        images_seq4=self.conv4(images_seq4)
-        images_seq4=images_seq4.flatten(start_dim=1)
-        images_seq5=self.conv5(images_seq5)
-        images_seq5=images_seq5.flatten(start_dim=1)
+        images_seq2 = images_seq2.view(B, T, -1)  # [B, T, D] 128*16*16
+        images_seq2=self.gru(images_seq2)[:,-1,:]
+
+        #print(images_seq2.shape)
         
-        x=torch.cat([images_seq1,images_seq2,images_seq3,images_seq4,images_seq5],dim=-1)
-        x=self.fc1(x)
-        x=self.fc2(x)
-        x=self.fc3(x)
+        
+        
+        
+        x=self.fc1(images_seq1)
+        x=torch.cat([x,images_seq2],dim=-1)
+        #x=self.fc2(x)
+        #x=self.fc3(x)
         x=self.fc4(x)
         return x
 
