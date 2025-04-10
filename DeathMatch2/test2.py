@@ -57,10 +57,10 @@ def get_state(game):
     ]
 
     all_class=[
-        [class_opponent,[255, 0, 0,0],[]],
-        [class_self,[0,  255, 0,0],[]],
-        [class_buff,[0, 0, 255,0],[]],
-        [class_rocket,[0, 0, 0,255],[]],
+        [class_opponent,np.array([255, 0, 0,0]),[]],
+        [class_self,np.array([0,  255, 0,0]),[]],
+        [class_buff,np.array([0, 0, 255,0]),[]],
+        [class_rocket,np.array([0, 0, 0,255]),[]],
     ]
 
    
@@ -80,7 +80,7 @@ def get_state(game):
                 break
     for i in range(len(all_class)):
         color_map[np.isin(labels,all_class[i][2])]=all_class[i][1]
-    #
+    
     color_map_process = color_map[:-75,:, :]
 
     color_map_process = cv2.resize(color_map_process, (128, 128))
@@ -163,7 +163,7 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     if current_ammo<previous_ammo:
         reward += (current_ammo - previous_ammo) * 100
     #if current_health>previous_health:
-    reward += (current_health - previous_health) * 10
+    #reward += (current_health - previous_health) * 10
     
     previous_kill_count = current_kill_count
     previous_health = current_health
@@ -171,7 +171,7 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     
     done = game.is_episode_finished()
     
-    if done and previous_health<=0:
+    if done:
         reward=-1000
     # elif done and previous_health>0:
     #     reward=1000
