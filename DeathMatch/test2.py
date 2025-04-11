@@ -205,7 +205,7 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     if current_ammo<previous_ammo:
         reward += (current_ammo - previous_ammo) * 100
     #if current_health>previous_health:
-    reward += (current_health - previous_health) * 1
+    #reward += (current_health - previous_health) * 1
     
     previous_kill_count = current_kill_count
     previous_health = current_health
@@ -213,7 +213,7 @@ def get_reward(game,previous_kill_count,previous_health,previous_ammo):
     
     done = game.is_episode_finished()
     
-    if done and previous_health<=0:
+    if done:
         reward=-1000
     # elif done and previous_health>0:
     #     reward=1000

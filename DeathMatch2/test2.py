@@ -202,10 +202,10 @@ game.set_window_visible(False)
 game.init()
 
 
-num_actions=9
+num_actions=10
 agent = ppo2.PPO(input_size=128,output_dim=num_actions)
 
-frame_repeat=10
+frame_repeat=3
 step=1
 while True:
     game.new_episode()  # 重新开始游戏
